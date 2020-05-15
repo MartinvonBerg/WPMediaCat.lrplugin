@@ -15,9 +15,7 @@ LrMobdebug.start()
 function dialogs.sectionsForTopOfDialog( f, propertyTable )
   --LrMobdebug.on()
 	local bind = LrView.bind
-	local share = LrView.share
-	local LrFtp = import 'LrFtp'
-
+		
 	local result = {
 	
 		{
@@ -30,20 +28,20 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
-          EntryBox( f, 'hash-Value', 'hash'),
+          			EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
 					f:row {
 						fill_horizontal = true,				
 						f:push_button {
 							title = "Test Login",
 							action = function( button ) -- test the wp login
-								Log( "Pressedssss" )
+								Log( "Pressed Test Login button" )
 								LrFunctionContext.postAsyncTaskWithContext( "testPost", function( context ) 
-									local result = Post( "", {}, propertyTable )
+									local result = CheckLogin( propertyTable )
 									if result then
-                    local str = inspect(result)
+                    					local str = inspect(result)
 										Log( "Login Test returned: ", str )
 										--propertyTable.msgBox = "Login Test Returned OK"
-                    propertyTable.msgBox = str
+                    					propertyTable.msgBox = str
 									else
 										Log( "Post Test failed" )
 										propertyTable.msgBox = "Login Test Returned failed. No Result"

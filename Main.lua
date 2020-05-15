@@ -10,9 +10,11 @@ local LrErrors = import 'LrErrors'
 local LrFtp = import 'LrFtp'
 local LrTasks = import 'LrTasks'
 local LrBinding = import 'LrBinding'
+local LrFunctionContext = import 'LrFunctionContext'
+local LrHttp = import( 'LrHttp' )
 
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+LrMobdebug.start()
 
 local myLogger = LrLogger( 'NGGlog' )
 myLogger:enable( "logfile" )
@@ -45,7 +47,9 @@ publishServiceProvider.exportPresetFields = {
 	{ key = "siteURL", default = "" },
 	{ key = "loginName", default = "" },
 	{ key = "loginPassword", default = "" },
-  { key = "hash", default = ""},
+	{ key = "hash", default = ""},
+	{ key = "pwdok", default = "false"},
+	{ key = "urlreadable", default = "false"},
 }
 
 -- menu titles, Albums, Galleries per NG rather then Collections & Sets
@@ -54,12 +58,81 @@ publishServiceProvider.titleForPublishedCollectionSet = "NextGen2 Album"
 publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album" 
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 
+function GetMedia( publishSettings, perpage, page ) 
+	LrMobdebug.on()
+	local ReturnTable = {} 
+	local hash = 'Basic ' .. publishSettings.hash 
+	local httphead = {
+      {field='Authorization', value=hash},
+    }
+  local url = ''  
+  if perpage > 0 then
+    url = publishSettings.siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
+  else
+    url = publishSettings.siteURL .. "/wp-json/wp/v2/media/"
+  end
+  
+  
+	local result, headers = LrHttp.get( url, httphead )
+
+	if headers.status == 200 then
+    result = JSON:decode(result)
+  else
+    result = nil
+  end
+  
+  return result
+ end
+
+
+
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
-  --LrMobdebug.on()
-  --o2L('call goToPublishedCollection')
+  LrMobdebug.on()
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
+  local nphotos = collection:getPhotos()
+  local firstsync = 'false'
+  --local url = publishSettings.siteURL .. "/wp-json/wp/v2/"
+  local result
+  local mediatable = {}
+  local len = 0
+  local perpage = 100
+  local getmore = true
+  local runs = 0
   
+  if nphotos[1] == nil then
+    firstsync = 'true'
+  end
+  
+  if firstsync and publishSettings.urlreadable then
+    while getmore == true
+    do
+      LrFunctionContext.callWithContext( "GetMedia", function( context )    
+         result = GetMedia(publishSettings, perpage, runs+1)
+      end,
+      result)
+      len = #result
+          
+      local i = 1
+      while result[i] ~= nil
+      do
+        local row = {id = result[i].id, phurl = result[i].source_url} 
+        local index = runs * perpage + i
+        mediatable[index] = row
+        i = i+1
+      end
+      
+      if len == perpage then
+        getmore = true
+        runs = runs +1
+      else
+        getmore = false
+      end
+      
+    end
+    local done = "true"
+  end 
+  --[[
   local lrid = catalog:findPhotos {
 		searchDesc = {
 			criteria = "filename",
@@ -74,6 +147,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
 		--lrid:setEditedFlag(false)
 		
 	end)
+  ]]
   o2L('Photo published')
   
   --catalog:withWriteAccessDo( 'SetFlag', function () 
