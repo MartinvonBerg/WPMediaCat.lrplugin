@@ -1,0 +1,12 @@
+Plug-in error log for plug-in at: D:\Lightroom\LR_9.0_201910171147-f2855d44.master_mac_SDK\Sample Plugins\NggPlusPlus.lrdevplugin
+
+**** Error 1
+
+Beim Ausführen eines Skripts des Zusatzmoduls ist ein Fehler aufgetreten.
+Post.lua:30: '}' expected (to close '{' at line 26) near '=')
+
+**** Error 2
+
+Der Nachbearbeitungsfilter dieses Zusatzmoduls konnte nicht geladen werden.
+Post.lua:30: '}' expected (to close '{' at line 26) near '=')
+

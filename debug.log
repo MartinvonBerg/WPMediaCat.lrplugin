@@ -1,0 +1,82 @@
+18/03/09 10:31:05com.johnrellis.logger	TRACE	542284265 546825600 = 4541334
+18/03/09 10:31:05com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:31:05com.johnrellis.logger	TRACE	Starting
+18/03/09 10:31:05com.johnrellis.logger	TRACE	542284265 546825600 = 4541334
+18/03/09 10:31:05com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:31:05com.johnrellis.logger	TRACE	Starting
+18/03/09 10:31:10com.johnrellis.logger	TRACE	542284270 546825600 = 4541329
+18/03/09 10:31:10com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:31:10com.johnrellis.logger	TRACE	Starting
+18/03/09 10:31:25com.johnrellis.logger	TRACE	Parent count:  1
+18/03/09 10:31:25com.johnrellis.logger	TRACE	new parent:  13
+18/03/09 10:31:25com.johnrellis.logger	TRACE	Reparenting collection:  23
+18/03/09 10:35:46com.johnrellis.logger	TRACE	Starting
+18/03/09 10:36:54com.johnrellis.logger	TRACE	Starting
+18/03/09 10:37:58com.johnrellis.logger	TRACE	Starting
+18/03/09 10:38:27com.johnrellis.logger	TRACE	Starting
+18/03/09 10:39:12com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:39:12com.johnrellis.logger	TRACE	Starting
+18/03/09 10:43:39com.johnrellis.logger	TRACE	Starting
+18/03/09 10:44:06com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:44:06com.johnrellis.logger	TRACE	Starting
+18/03/09 10:45:06com.johnrellis.logger	TRACE	Starting
+18/03/09 10:46:56com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:46:56com.johnrellis.logger	TRACE	Starting
+18/03/09 10:49:35com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:49:36com.johnrellis.logger	TRACE	Starting
+18/03/09 10:50:43com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 10:50:43com.johnrellis.logger	TRACE	Starting
+18/03/09 10:59:59com.johnrellis.logger	TRACE	Starting
+18/03/09 11:00:35com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:00:35com.johnrellis.logger	TRACE	Starting
+18/03/09 11:03:57com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:03:57com.johnrellis.logger	TRACE	Starting
+18/03/09 11:04:28com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:04:28com.johnrellis.logger	TRACE	Starting
+18/03/09 11:06:36com.johnrellis.logger	TRACE	Starting
+18/03/09 11:07:31com.johnrellis.logger	TRACE	Starting
+18/03/09 11:07:32com.johnrellis.logger	TRACE	Starting
+18/03/09 11:07:46com.johnrellis.logger	TRACE	Starting
+18/03/09 11:08:10com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:08:10com.johnrellis.logger	TRACE	Starting
+18/03/09 11:08:20com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:08:20com.johnrellis.logger	TRACE	Starting
+18/03/09 11:10:19com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:10:19com.johnrellis.logger	TRACE	Starting
+18/03/09 11:10:27com.johnrellis.logger	TRACE	Pressedssss
+18/03/09 11:10:28com.johnrellis.logger	TRACE	Login Test returned:  {"Test Return":"OK"}
+18/03/09 11:11:19com.johnrellis.logger	TRACE	Pressedssss
+18/03/09 11:11:20com.johnrellis.logger	TRACE	Login Test returned:  {"Test Return":"OK"}
+18/03/09 11:11:26com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:11:26com.johnrellis.logger	TRACE	Starting
+18/03/09 11:11:53com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:11:53com.johnrellis.logger	TRACE	Starting
+18/03/09 11:11:54com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%% start export %%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:11:54com.johnrellis.logger	TRACE	% Publishing 1 image(s) to NextGen       %
+18/03/09 11:11:54com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:11:54com.johnrellis.logger	TRACE	Max Tasks 6
+18/03/09 11:12:00com.johnrellis.logger	TRACE	Image to be RePublished: 20170909_SONY__DSC3178.jpg. 1 of 1 (id=268)
+18/03/09 11:12:00com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:00com.johnrellis.logger	TRACE	% Publish done: 1 images in 6 seconds. Average: 6.100121
+18/03/09 11:12:00com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:01com.johnrellis.logger	TRACE	Upload task 0 of 1 finishing for Image 1 (id=268). Upload time: 1 seconds
+18/03/09 11:12:12com.johnrellis.logger	TRACE	Creating gallery NextGen Gallery
+18/03/09 11:12:12com.johnrellis.logger	TRACE	Set remote album id:  24
+18/03/09 11:12:15com.johnrellis.logger	TRACE	------------------------- start ------------------------------
+18/03/09 11:12:15com.johnrellis.logger	TRACE	Starting
+18/03/09 11:12:15com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%% start export %%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:15com.johnrellis.logger	TRACE	% Publishing 1 image(s) to NextGen       %
+18/03/09 11:12:15com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:15com.johnrellis.logger	TRACE	Max Tasks 6
+18/03/09 11:12:21com.johnrellis.logger	TRACE	New Image to be Published: 20170909_SONY__DSC3178.jpg. 1 of 1
+18/03/09 11:12:21com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:21com.johnrellis.logger	TRACE	% Publish done: 1 images in 6 seconds. Average: 6.185528
+18/03/09 11:12:21com.johnrellis.logger	TRACE	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+18/03/09 11:12:21com.johnrellis.logger	TRACE	Sort: zero length id sequence. Nothing to sort
+18/03/09 11:12:23com.johnrellis.logger	TRACE	Upload task 0 of 1 finishing for Image 1 (id=272). Upload time: 2 seconds
+18/03/09 11:12:32com.johnrellis.logger	TRACE	Delete collection or set
+18/03/09 11:12:32com.johnrellis.logger	TRACE	Deleting collection:  24
+18/03/09 12:11:00com.johnrellis.logger	TRACE	Pressedssss
+18/03/09 12:11:01com.johnrellis.logger	TRACE	Login Test returned:  {"Test Return":"OK"}
+18/03/09 12:15:09com.johnrellis.logger	TRACE	Starting
+18/03/09 12:15:53com.johnrellis.logger	TRACE	Starting
