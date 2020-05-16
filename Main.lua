@@ -59,32 +59,46 @@ publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album"
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 
 function GetMedia( publishSettings, perpage, page ) 
-	LrMobdebug.on()
-	local ReturnTable = {} 
 	local hash = 'Basic ' .. publishSettings.hash 
 	local httphead = {
       {field='Authorization', value=hash},
     }
-  local url = ''  
-  if perpage > 0 then
-    url = publishSettings.siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
-  else
-    url = publishSettings.siteURL .. "/wp-json/wp/v2/media/"
-  end
-  
-  
+	local url = ''  
+	if perpage ~=nil then
+		url = publishSettings.siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
+	else
+		url = publishSettings.siteURL .. "/wp-json/wp/v2/media/"
+	end
+   
 	local result, headers = LrHttp.get( url, httphead )
 
 	if headers.status == 200 then
-    result = JSON:decode(result)
-  else
-    result = nil
-  end
+    	result = JSON:decode(result)
+  	else
+    	result = nil
+  	end
   
   return result
  end
 
+function replhyphen(filen)
+	filen = filen:reverse()
+	local nfound = 0
+	local newstring = filen
 
+	for i = 1, filen:len() do
+	local letter = filen:sub(i,i ) 
+		if (letter == '-')  then
+			if (nfound > 0) then
+				newstring = newstring:sub(1,i-1) .. '_' .. newstring:sub(i+1,newstring:len())
+			end
+			nfound = nfound + 1
+		end
+	end
+
+	filen = newstring:reverse()
+	return filen
+end
 
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   LrMobdebug.on()
@@ -92,18 +106,17 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos()
   local firstsync = 'false'
-  --local url = publishSettings.siteURL .. "/wp-json/wp/v2/"
   local result
   local mediatable = {}
   local len = 0
-  local perpage = 100
+  local perpage = 30
   local getmore = true
   local runs = 0
   
   if nphotos[1] == nil then
-    firstsync = 'true'
+    firstsync = 'true' -- TODO: noch als globale Variable definieren
   end
-  
+   
   if firstsync and publishSettings.urlreadable then
     while getmore == true
     do
@@ -116,7 +129,19 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       local i = 1
       while result[i] ~= nil
       do
-        local row = {id = result[i].id, phurl = result[i].source_url} 
+        local row = {}
+        local keyfound = false
+        local str = inspect(result[i])
+        local ii,j = string.find(str,'full')
+        if ii ~= nil then
+          keyfound = true  
+        end
+        if keyfound then
+          row = {id = result[i].id, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+        else
+          row = {id = result[i].id, phurl = result[i].source_url, filen = ''}
+        end
+        
         local index = runs * perpage + i
         mediatable[index] = row
         i = i+1
@@ -125,35 +150,61 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
+        break
       else
         getmore = false
       end
       
     end
-    local done = "true"
-  end 
-  --[[
-  local lrid = catalog:findPhotos {
-		searchDesc = {
-			criteria = "filename",
-			operation = "==",
-			value = 'Franken_2019_08-29.jpg' ,
-		}
-	} 
+	LrDialogs.message ( string.format("Found %d Photos. Adding to collection now.", #mediatable),'','info')
+  local foundph = {}
+  local notfound = {}
+  local nfound = 1
+  local nnotfound = 1
+  local lrid = {}
   
-  catalog:withWriteAccessDo( 'AddtoWP', function () 
-		collection:addPhotos(lrid)
-    --local photo = publishedPhoto:getPhoto()
-		--lrid:setEditedFlag(false)
-		
-	end)
-  ]]
-  o2L('Photo published')
-  
-  --catalog:withWriteAccessDo( 'SetFlag', function () 
-    --photos:setEditedFlag(false)
+  --LrTasks.startAsyncTask( function ()
+    local catalog = LrApplication.activeCatalog()
+    for i=1,#mediatable do
+      local filen = mediatable[i].filen
+      local lrid = {}
+      LrTasks.startAsyncTask( function ()
+        lrid = catalog:findPhotos {
+          searchDesc = {
+            criteria = "filename",
+            operation = "==",
+            value = filen,
+          }
+        }
+      end)
+      local runs = LrTasks.canYield()
+      
+        if lrid[1] ~= nil then
+          filen = replhyphen(filen)
+          lrid = catalog:findPhotos {
+            searchDesc = {
+              criteria = "filename",
+              operation = "==",
+              value = filen,
+            }
+          }
+        end
+      
+    
+      if lrid[1] ~= nil then
+        foundph[nfound] = mediatable[i]
+        --catalog:withWriteAccessDo( 'AddtoWP', function () 
+        --  collection:addPhotos(lrid)
+        --end )
+        nfound = nfound +1
+      else
+        notfound[nnotfound] = mediatable[i]
+        nnotfound = nnotfound +1
+      end
+    end
   --end)
-  
+
+end
 end
 
 -- collection or collection set rename callback
