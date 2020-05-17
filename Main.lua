@@ -58,7 +58,7 @@ publishServiceProvider.titleForPublishedCollectionSet = "NextGen2 Album"
 publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album" 
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 
-function GetMedia( publishSettings, perpage, page ) 
+local function GetMedia( publishSettings, perpage, page ) 
 	local hash = 'Basic ' .. publishSettings.hash 
 	local httphead = {
       {field='Authorization', value=hash},
@@ -81,7 +81,7 @@ function GetMedia( publishSettings, perpage, page )
   return result
  end
 
-function replhyphen(filen)
+local function replhyphen(filen)
 	filen = filen:reverse()
 	local nfound = 0
 	local newstring = filen
@@ -100,6 +100,32 @@ function replhyphen(filen)
 	return filen
 end
 
+local function add2Cat (collection, file)
+  local success = false
+  local lrid = {}
+    
+    --LrTasks.startAsyncTask(function ()
+    LrFunctionContext.postAsyncTaskWithContext('add2Cat', function (context)
+    
+    local catalog = LrApplication.activeCatalog()
+    
+    lrid = catalog:findPhotos {
+      searchDesc = {
+        criteria = "filename",
+        operation = "==",
+        value = file,
+      }
+    }
+    --[[   
+    catalog:withWriteAccessDo( 'AddtoWP', function () 
+        collection:addPhotos(lrid)
+        success = true
+      end ) ]]    
+    end, lrid)
+  
+  return lrid 
+end
+
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   LrMobdebug.on()
   local collection = info.publishedCollection
@@ -108,8 +134,9 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local firstsync = 'false'
   local result
   local mediatable = {}
+  local files = {}
   local len = 0
-  local perpage = 30
+  local perpage = 100
   local getmore = true
   local runs = 0
   
@@ -138,6 +165,8 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         end
         if keyfound then
           row = {id = result[i].id, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+          local index = runs * perpage + i
+          files[index] = result[i].media_details.sizes.full.file
         else
           row = {id = result[i].id, phurl = result[i].source_url, filen = ''}
         end
@@ -150,7 +179,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        break
+        
       else
         getmore = false
       end
@@ -162,50 +191,25 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local nfound = 1
   local nnotfound = 1
   local lrid = {}
-  
-  --LrTasks.startAsyncTask( function ()
-    local catalog = LrApplication.activeCatalog()
-    for i=1,#mediatable do
-      local filen = mediatable[i].filen
-      local lrid = {}
-      LrTasks.startAsyncTask( function ()
-        lrid = catalog:findPhotos {
-          searchDesc = {
-            criteria = "filename",
-            operation = "==",
-            value = filen,
-          }
-        }
-      end)
-      local runs = LrTasks.canYield()
-      
-        if lrid[1] ~= nil then
-          filen = replhyphen(filen)
-          lrid = catalog:findPhotos {
-            searchDesc = {
-              criteria = "filename",
-              operation = "==",
-              value = filen,
-            }
-          }
-        end
-      
     
-      if lrid[1] ~= nil then
+  for i=1,#mediatable do
+      local filen = mediatable[i].filen
+      local success = false
+      filen = replhyphen(filen)
+      --success = add2Cat(collection, filen)
+   
+                     
+      if success then
         foundph[nfound] = mediatable[i]
-        --catalog:withWriteAccessDo( 'AddtoWP', function () 
-        --  collection:addPhotos(lrid)
-        --end )
         nfound = nfound +1
       else
         notfound[nnotfound] = mediatable[i]
         nnotfound = nnotfound +1
       end
-    end
-  --end)
+  end
 
-end
-end
+  end -- if firtsync
+end -- function
 
 -- collection or collection set rename callback
 function publishServiceProvider.renamePublishedCollection( publishSettings, info )
