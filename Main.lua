@@ -12,6 +12,8 @@ local LrTasks = import 'LrTasks'
 local LrBinding = import 'LrBinding'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrHttp = import( 'LrHttp' )
+local LrFileUtils = import('LrFileUtils')
+--local LrPhoto = import('LrPhoto')
 
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
@@ -104,8 +106,8 @@ local function add2Cat (collection, file)
   local success = false
   local lrid = {}
     
-    --LrTasks.startAsyncTask(function ()
-    LrFunctionContext.postAsyncTaskWithContext('add2Cat', function (context)
+    LrTasks.startAsyncTask(function ()
+    --LrFunctionContext.postAsyncTaskWithContext('add2Cat', function (context)
     
     local catalog = LrApplication.activeCatalog()
     
@@ -116,14 +118,15 @@ local function add2Cat (collection, file)
         value = file,
       }
     }
-    --[[   
+    Log(lrid)
     catalog:withWriteAccessDo( 'AddtoWP', function () 
         collection:addPhotos(lrid)
+        Log("lrid: ", lrid)
         success = true
-      end ) ]]    
-    end, lrid)
+      end )    
+    end )
   
-  return lrid 
+  --return lrid 
 end
 
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
@@ -136,9 +139,10 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local mediatable = {}
   local files = {}
   local len = 0
-  local perpage = 100
+  local perpage = 5
   local getmore = true
   local runs = 0
+  local plugpath = _PLUGIN.path
   
   if nphotos[1] == nil then
     firstsync = 'true' -- TODO: noch als globale Variable definieren
@@ -179,32 +183,48 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        
+        break
       else
         getmore = false
       end
       
     end
 	LrDialogs.message ( string.format("Found %d Photos. Adding to collection now.", #mediatable),'','info')
+  
   local foundph = {}
   local notfound = {}
   local nfound = 1
   local nnotfound = 1
-  local lrid = {}
-    
+  local phid = {}
+   
   for i=1,#mediatable do
       local filen = mediatable[i].filen
       local success = false
+      local phid = {}
+			local p = string.gsub( plugpath,"\\","/")
+      
       filen = replhyphen(filen)
-      --success = add2Cat(collection, filen)
-   
-                     
-      if success then
+      success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename like '" .. filen .."'\" > " .. p .. "/test.txt") 
+      local lrid = LrFileUtils.readFile( p ..'/test.txt' )
+      lrid = tonumber(lrid)   
+      
+      if i ==1 then
+       --add2Cat(collection, filen)
+      end
+      
+      if lrid ~=nil then
         foundph[nfound] = mediatable[i]
         nfound = nfound +1
+        --o2L(lrid)
+        phid = {"LrPhoto( id \"" .. lrid .. "\" )"}
+        success = phid.catalog
+        catalog:withWriteAccessDo( 'AddtoWP', function () 
+          collection:addPhotos(phid)
+        end ) 
       else
         notfound[nnotfound] = mediatable[i]
         nnotfound = nnotfound +1
+        
       end
   end
 
