@@ -36,7 +36,7 @@ function CheckLogin( publishSettings )
 
 	if headers.status == 200 then
 		ReturnTable['warning'] = 'REST-API (GET) of site can be reached without PWD! Check OAuth!'
-		publishSettings.urlreadable = 'true'
+		publishSettings.urlreadable = true
 
 		local result, headers = LrHttp.post( url, '', httphead )
     

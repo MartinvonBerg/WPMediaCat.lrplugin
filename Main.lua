@@ -51,7 +51,7 @@ publishServiceProvider.exportPresetFields = {
 	{ key = "loginPassword", default = "" },
 	{ key = "hash", default = ""},
 	{ key = "pwdok", default = "false"},
-	{ key = "urlreadable", default = "false"},
+	{ key = "urlreadable", default = false},
 }
 
 -- menu titles, Albums, Galleries per NG rather then Collections & Sets
@@ -102,32 +102,31 @@ local function replhyphen(filen)
 	return filen
 end
 
-local function add2Cat (collection, file)
-  local success = false
-  local lrid = {}
-    
-    LrTasks.startAsyncTask(function ()
-    --LrFunctionContext.postAsyncTaskWithContext('add2Cat', function (context)
-    
-    local catalog = LrApplication.activeCatalog()
-    
-    lrid = catalog:findPhotos {
-      searchDesc = {
-        criteria = "filename",
-        operation = "==",
-        value = file,
-      }
-    }
-    Log(lrid)
-    catalog:withWriteAccessDo( 'AddtoWP', function () 
-        collection:addPhotos(lrid)
-        Log("lrid: ", lrid)
-        success = true
-      end )    
-    end )
-  
-  --return lrid 
+function SplitFilename(strFilename)
+	-- Returns the baseFilename, and Extension as 2 values
+	return string.match(strFilename, "(.-)%.(%a+)")
 end
+
+local function add2Cat (collection, search)
+  
+  LrTasks.startAsyncTask(function ()
+    LrMobdebug.on()
+    local catalog = LrApplication.activeCatalog()
+    local len = #search
+    for i=1,len do
+      local lrid = catalog:findPhotos {
+        searchDesc = {search[i],
+        combine = "union"}
+      }
+      
+      catalog:withWriteAccessDo( 'AddtoWP', function () 
+          collection:addPhotos(lrid)
+        end )   
+    end
+  end )
+end
+  
+  
 
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   LrMobdebug.on()
@@ -139,16 +138,16 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local mediatable = {}
   local files = {}
   local len = 0
-  local perpage = 5
+  local perpage = 100
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
   
-  if nphotos[1] == nil then
-    firstsync = 'true' -- TODO: noch als globale Variable definieren
+  if #nphotos == 0 then
+    firstsync = true -- TODO: noch als globale Variable definieren
   end
    
-  if firstsync and publishSettings.urlreadable then
+  if (firstsync == true and publishSettings.urlreadable == true) then
     while getmore == true
     do
       LrFunctionContext.callWithContext( "GetMedia", function( context )    
@@ -172,7 +171,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
           local index = runs * perpage + i
           files[index] = result[i].media_details.sizes.full.file
         else
-          row = {id = result[i].id, phurl = result[i].source_url, filen = ''}
+          row = {id = result[i].id, phurl = result[i].source_url, filen = ''} -- TODO : Sonderbehandlung für bilder ohne fullsize angabe
         end
         
         local index = runs * perpage + i
@@ -183,51 +182,84 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        break
+        --break -- nur für Testzwecke: zum vozeitigen Abbruch
       else
         getmore = false
       end
       
     end
-	LrDialogs.message ( string.format("Found %d Photos. Adding to collection now.", #mediatable),'','info')
+	LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
   
   local foundph = {}
   local notfound = {}
   local nfound = 1
   local nnotfound = 1
-  local phid = {}
+  local searchDesc = {}
+  local p = string.gsub( plugpath,"\\","/")
    
   for i=1,#mediatable do
       local filen = mediatable[i].filen
       local success = false
-      local phid = {}
-			local p = string.gsub( plugpath,"\\","/")
-      
-      filen = replhyphen(filen)
-      success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename like '" .. filen .."'\" > " .. p .. "/test.txt") 
-      local lrid = LrFileUtils.readFile( p ..'/test.txt' )
-      lrid = tonumber(lrid)   
-      
-      if i ==1 then
-       --add2Cat(collection, filen)
+      local lrid
+      if filen:find('Bretagne_10_08_346',1,true) then
+        --o2L('found')
       end
       
+      if #filen > 3 then
+      -- suche mit Dateiname aus WP
+        success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
+        lrid = LrFileUtils.readFile( p ..'/test.txt' )
+        if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+        lrid = tonumber(lrid)
+      
+        if lrid == nil then
+          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          lrid = LrFileUtils.readFile( p ..'/test.txt' )
+          if #lrid > 9 then 
+            lrid = string.sub(lrid,1,7) 
+          end
+          lrid = tonumber(lrid)
+        end
+        
+        if lrid == nil then
+          local base, ext = SplitFilename(filen)
+          if base ~= nil then
+            success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where baseName like '" .. base .."%'\" > " .. p .. "/test.txt") 
+            lrid = LrFileUtils.readFile( p ..'/test.txt' )
+            if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+            lrid = tonumber(lrid)
+            if lrid ~= nil then
+              filen = base
+            end
+          end
+        end
+      
+        if lrid == nil then
+          filen = replhyphen(filen)
+          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          lrid = LrFileUtils.readFile( p ..'/test.txt' )
+          if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+          lrid = tonumber(lrid)
+        end
+      --- ende dersuche
+      else
+        lrid = nil
+      end
+    
       if lrid ~=nil then
-        foundph[nfound] = mediatable[i]
+        foundph[nfound] = mediatable[i] -- TODO : Sonderbehandlung wenn filen = ''
+        searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
         nfound = nfound +1
-        --o2L(lrid)
-        phid = {"LrPhoto( id \"" .. lrid .. "\" )"}
-        success = phid.catalog
-        catalog:withWriteAccessDo( 'AddtoWP', function () 
-          collection:addPhotos(phid)
-        end ) 
       else
         notfound[nnotfound] = mediatable[i]
         nnotfound = nnotfound +1
-        
       end
   end
-
+  local str = inspect(notfound)
+  o2L(str)
+  
+  add2Cat(collection, searchDesc)
+  
   end -- if firtsync
 end -- function
 
