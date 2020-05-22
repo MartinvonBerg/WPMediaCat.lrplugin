@@ -107,12 +107,14 @@ function SplitFilename(strFilename)
 	return string.match(strFilename, "(.-)%.(%a+)")
 end
 
-local function add2Cat (collection, search)
+local function add2Cat (collection, search, result, plugin)
   
   LrTasks.startAsyncTask(function ()
     LrMobdebug.on()
+    local _PLUGIN = plugin
     local catalog = LrApplication.activeCatalog()
     local len = #search
+        
     for i=1,len do
       local lrid = catalog:findPhotos {
         searchDesc = {search[i],
@@ -120,13 +122,25 @@ local function add2Cat (collection, search)
       }
       
       catalog:withWriteAccessDo( 'AddtoWP', function () 
-          collection:addPhotos(lrid)
-        end )   
+		    collection:addPhotos(lrid)
+		  end ) 
+	      
+	  catalog:withWriteAccessDo( 'AddMetaData', function () 
+		--collection:addPhotos(lrid)
+	  lrid:setPropertyForPlugin(_PLUGIN,'wpid', result[i].id)
+		lrid:setPropertyForPlugin(_PLUGIN,'gallery', 'test')
+	   -- lrid:setPropertyForPlugin(_PLUGIN,'upldate', tostring(result[i].upldate))
+	  --lrid:setPropertyForPlugin(_PLUGIN,'wpwidth', result[i].width)
+	  --lrid:setPropertyForPlugin(_PLUGIN,'wpheight', result[i].height)
+	  --lrid:setPropertyForPlugin(_PLUGIN,'wpimgurl', result[i].source_url)
+	  --lrid:setPropertyForPlugin(_PLUGIN,'slug', result[i].slug)
+	  --lrid:setPropertyForPlugin(_PLUGIN,'post', result[i].post)
+	  --lrid:setPropertyForPlugin(_PLUGIN,'gallery', result[i].gallery) 
+    end ) 
+    
     end
   end )
 end
-  
-  
 
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   LrMobdebug.on()
@@ -138,7 +152,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local mediatable = {}
   local files = {}
   local len = 0
-  local perpage = 100
+  local perpage = 3
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
@@ -165,13 +179,13 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         local ii,j = string.find(str,'full')
         if ii ~= nil then
           keyfound = true  
-        end
+		end
+		
         if keyfound then
-          row = {id = result[i].id, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
-          local index = runs * perpage + i
-          files[index] = result[i].media_details.sizes.full.file
+          row = {id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
         else
-          row = {id = result[i].id, phurl = result[i].source_url, filen = ''} -- TODO : Sonderbehandlung für bilder ohne fullsize angabe
+		  row = {id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = ''} 
+		  -- TODO : Sonderbehandlung für bilder ohne fullsize angabe
         end
         
         local index = runs * perpage + i
@@ -182,7 +196,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        --break -- nur für Testzwecke: zum vozeitigen Abbruch
+        break -- nur für Testzwecke: zum vozeitigen Abbruch
       else
         getmore = false
       end
@@ -257,8 +271,8 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   end
   local str = inspect(notfound)
   o2L(str)
-  
-  add2Cat(collection, searchDesc)
+  local plugin = _PLUGIN
+  add2Cat(collection, searchDesc, foundph, plugin)
   
   end -- if firtsync
 end -- function

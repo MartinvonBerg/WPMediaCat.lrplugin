@@ -15,10 +15,12 @@ return {
 	LrPluginName = LOC "$$$/Wordpress/PluginName=WP_MediaCat2",
 	
 	LrExportServiceProvider = {
-		title = LOC "$$$/Wordpress/Wordpress-title=WP_MediaCat",
+		title = LOC "$$$/Wordpress/Wordpress-title=WP_MediaCat2",
 		file = 'Main.lua',
 	},
-	VERSION = { major=1, minor=0, revision=0, build=1, },
+	LrMetadataProvider  = 'WPMediaCat2Meta.lua',
+	
+	VERSION = { major=2, minor=0, revision=0, build=1, },
 }
 
 
