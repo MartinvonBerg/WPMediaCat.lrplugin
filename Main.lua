@@ -54,10 +54,6 @@ publishServiceProvider.exportPresetFields = {
 	{ key = "urlreadable", default = false},
 }
 
--- menu titles, Albums, Galleries per NG rather then Collections & Sets
---publishServiceProvider.titleForPublishedCollection = "NextGen2 Gallery"
---publishServiceProvider.titleForPublishedCollectionSet = "NextGen2 Album"
---publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album" 
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
@@ -115,7 +111,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local result
   local mediatable = {}
   local len = 0
-  local perpage = 10
+  local perpage = 50
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
@@ -165,7 +161,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       end
       
     end
-	LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
+	--LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
   
   local foundph = {}
   local notfound = {}
@@ -235,26 +231,44 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   
   add2Cat(collection, searchDesc, foundph)
   LrTasks.sleep(nfound*0.5)
-  --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-  local photos = collection:getPhotos()
+  
+  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+  
   catalog:withWriteAccessDo( 'AddMetaData', function () 
-		for i, photo in ipairs( photos ) do 
+    for i=1, nfound-1 do
         if i > #foundph then
           break
         end
-        local phid = foundph[i].lrid
-        photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
-        local date = tostring(foundph[i].upldate)
-        date = iso8601ToTime(date)
-        date = LrDate.formatShortDate(date)
+        local photos = foundph[i].lrid
         
-        photo:setPropertyForPlugin (_PLUGIN,'upldate', date)
-        photo:setPropertyForPlugin(_PLUGIN,'wpwidth', tostring(foundph[i].width))
-        photo:setPropertyForPlugin(_PLUGIN,'wpheight', tostring(foundph[i].height))
-        photo:setPropertyForPlugin(_PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
-        photo:setPropertyForPlugin(_PLUGIN,'slug', tostring(foundph[i].slug))
-        photo:setPropertyForPlugin(_PLUGIN,'post', tostring(foundph[i].post))
-        photo:setPropertyForPlugin(_PLUGIN,'gallery', tostring(foundph[i].gallery) )
+        if foundph[i].filen == 'Mallorca_2015_03-33_PC2.jpg'then
+          local test = 'dfsd'
+        end
+        local photo2 = foundph[i].lrid
+        if photo2[2] ~= nil then
+          local label = {} 
+          local copy = {}
+          for k, ph in ipairs(photo2) do
+            label[k] = ph:getFormattedMetadata('label')
+            copy[k] =  ph:getFormattedMetadata('copyName')
+          end
+          local test = 'dfsd'
+        end
+        
+        for j, photo in ipairs(photos) do
+          local date = tostring(foundph[i].upldate)
+          date = iso8601ToTime(date)
+          date = LrDate.formatShortDate(date)
+
+          photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
+          photo:setPropertyForPlugin (_PLUGIN,'upldate', date)
+          photo:setPropertyForPlugin(_PLUGIN,'wpwidth', tostring(foundph[i].width))
+          photo:setPropertyForPlugin(_PLUGIN,'wpheight', tostring(foundph[i].height))
+          photo:setPropertyForPlugin(_PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+          photo:setPropertyForPlugin(_PLUGIN,'slug', tostring(foundph[i].slug))
+          photo:setPropertyForPlugin(_PLUGIN,'post', tostring(foundph[i].post))
+          photo:setPropertyForPlugin(_PLUGIN,'gallery', tostring(foundph[i].gallery) )
+        end
        
     end 
   end )
