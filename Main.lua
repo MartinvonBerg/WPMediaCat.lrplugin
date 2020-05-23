@@ -87,13 +87,41 @@ local function add2Cat (collection, search, photos)
     LrMobdebug.on()
     local catalog = LrApplication.activeCatalog()
     local len = #search
+    local selphoto
         
     for i=1,len do
       local lrid = catalog:findPhotos {
         searchDesc = {search[i],
         combine = "union"}
       }
-      photos[i].lrid = lrid
+      photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+
+      if photos[i].filen == 'Mallorca_2015_03-33_PC2.jpg'then
+        local test = 'dfsd'
+      end
+
+      if lrid[2] ~= nil then
+        local label = {} 
+        local copy = {}
+        local sel = 0
+        local nred = 0
+        for k, ph in ipairs(lrid) do
+          label[k] = ph:getFormattedMetadata('label')
+          if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
+            sel = k
+            nred = nred +1
+          end
+          copy[k] =  ph:getFormattedMetadata('copyName')
+        end
+        
+        if nred == 1 then
+          selphoto = lrid[sel]
+          lrid = selphoto
+          --photos[i].lrid = lrid
+        end
+        
+      end
+      
       catalog:withWriteAccessDo( 'AddtoWP', function () 
 		    collection:addPhotos(lrid)
 		  end ) 
@@ -230,49 +258,35 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   end
   
   add2Cat(collection, searchDesc, foundph)
-  LrTasks.sleep(nfound*0.5)
+  --LrTasks.sleep(nfound*0.5)
   
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-  
+  --[[
   catalog:withWriteAccessDo( 'AddMetaData', function () 
     for i=1, nfound-1 do
         if i > #foundph then
           break
         end
         local photos = foundph[i].lrid
-        
-        if foundph[i].filen == 'Mallorca_2015_03-33_PC2.jpg'then
-          local test = 'dfsd'
-        end
-        local photo2 = foundph[i].lrid
-        if photo2[2] ~= nil then
-          local label = {} 
-          local copy = {}
-          for k, ph in ipairs(photo2) do
-            label[k] = ph:getFormattedMetadata('label')
-            copy[k] =  ph:getFormattedMetadata('copyName')
-          end
-          local test = 'dfsd'
-        end
-        
+                
         for j, photo in ipairs(photos) do
           local date = tostring(foundph[i].upldate)
           date = iso8601ToTime(date)
           date = LrDate.formatShortDate(date)
 
           photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
-          photo:setPropertyForPlugin (_PLUGIN,'upldate', date)
-          photo:setPropertyForPlugin(_PLUGIN,'wpwidth', tostring(foundph[i].width))
-          photo:setPropertyForPlugin(_PLUGIN,'wpheight', tostring(foundph[i].height))
-          photo:setPropertyForPlugin(_PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
-          photo:setPropertyForPlugin(_PLUGIN,'slug', tostring(foundph[i].slug))
-          photo:setPropertyForPlugin(_PLUGIN,'post', tostring(foundph[i].post))
-          photo:setPropertyForPlugin(_PLUGIN,'gallery', tostring(foundph[i].gallery) )
+          photo:setPropertyForPlugin( _PLUGIN,'upldate', date)
+          photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
+          photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
+          photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+          photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
+          photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
+          photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
         end
        
     end 
-  end )
-  
+  end ) -- catalog:withWriteAccessDo
+  ]]
   end -- if firtsync
 end -- function
 
