@@ -4,8 +4,6 @@ Info.lua
 Summary information for plug-in.
 ------------------------------------------------------------------------------]]
 
--- plugin naming legacy screw up. 
-
 return {
 	
 	LrSdkVersion = 6.0,

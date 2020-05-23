@@ -13,12 +13,11 @@ local LrBinding = import 'LrBinding'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrHttp = import( 'LrHttp' )
 local LrFileUtils = import('LrFileUtils')
---local LrPhoto = import('LrPhoto')
 
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 
-local myLogger = LrLogger( 'NGGlog' )
+local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
 local function o2L( message )
 	myLogger:trace( message )
@@ -29,6 +28,7 @@ require 'Dialogs'
 require 'Post'
 require 'Process'
 require 'Logger'
+require("helpers")
 
 local publishServiceProvider = {}
 
@@ -40,7 +40,7 @@ publishServiceProvider.hidePrintResolution = true									-- hide print res cont
 publishServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
 publishServiceProvider.hideSections = { 'exportLocation' }							-- hide export location
 
-publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- see process.jua
+publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- see process.lua
 
 publishServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua
 publishServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog
@@ -55,10 +55,11 @@ publishServiceProvider.exportPresetFields = {
 }
 
 -- menu titles, Albums, Galleries per NG rather then Collections & Sets
-publishServiceProvider.titleForPublishedCollection = "NextGen2 Gallery"
-publishServiceProvider.titleForPublishedCollectionSet = "NextGen2 Album"
-publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album" 
+--publishServiceProvider.titleForPublishedCollection = "NextGen2 Gallery"
+--publishServiceProvider.titleForPublishedCollectionSet = "NextGen2 Album"
+--publishServiceProvider.titleForPublishedSmartCollection = "Smart NextGen2 Album" 
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
+publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
 local function GetMedia( publishSettings, perpage, page ) 
 	local hash = 'Basic ' .. publishSettings.hash 
@@ -83,35 +84,11 @@ local function GetMedia( publishSettings, perpage, page )
   return result
  end
 
-local function replhyphen(filen)
-	filen = filen:reverse()
-	local nfound = 0
-	local newstring = filen
 
-	for i = 1, filen:len() do
-	local letter = filen:sub(i,i ) 
-		if (letter == '-')  then
-			if (nfound > 0) then
-				newstring = newstring:sub(1,i-1) .. '_' .. newstring:sub(i+1,newstring:len())
-			end
-			nfound = nfound + 1
-		end
-	end
-
-	filen = newstring:reverse()
-	return filen
-end
-
-function SplitFilename(strFilename)
-	-- Returns the baseFilename, and Extension as 2 values
-	return string.match(strFilename, "(.-)%.(%a+)")
-end
-
-local function add2Cat (collection, search, result, plugin)
+local function add2Cat (collection, search, photos)
   
   LrTasks.startAsyncTask(function ()
     LrMobdebug.on()
-    local _PLUGIN = plugin
     local catalog = LrApplication.activeCatalog()
     local len = #search
         
@@ -120,26 +97,13 @@ local function add2Cat (collection, search, result, plugin)
         searchDesc = {search[i],
         combine = "union"}
       }
-      
+      photos[i].lrid = lrid
       catalog:withWriteAccessDo( 'AddtoWP', function () 
 		    collection:addPhotos(lrid)
 		  end ) 
-	      
-	  catalog:withWriteAccessDo( 'AddMetaData', function () 
-		--collection:addPhotos(lrid)
-	  lrid:setPropertyForPlugin(_PLUGIN,'wpid', result[i].id)
-		lrid:setPropertyForPlugin(_PLUGIN,'gallery', 'test')
-	   -- lrid:setPropertyForPlugin(_PLUGIN,'upldate', tostring(result[i].upldate))
-	  --lrid:setPropertyForPlugin(_PLUGIN,'wpwidth', result[i].width)
-	  --lrid:setPropertyForPlugin(_PLUGIN,'wpheight', result[i].height)
-	  --lrid:setPropertyForPlugin(_PLUGIN,'wpimgurl', result[i].source_url)
-	  --lrid:setPropertyForPlugin(_PLUGIN,'slug', result[i].slug)
-	  --lrid:setPropertyForPlugin(_PLUGIN,'post', result[i].post)
-	  --lrid:setPropertyForPlugin(_PLUGIN,'gallery', result[i].gallery) 
-    end ) 
-    
     end
   end )
+  
 end
 
 function publishServiceProvider.goToPublishedCollection( publishSettings, info )
@@ -150,9 +114,8 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local firstsync = 'false'
   local result
   local mediatable = {}
-  local files = {}
   local len = 0
-  local perpage = 3
+  local perpage = 10
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
@@ -182,9 +145,9 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
 		end
 		
         if keyfound then
-          row = {id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
         else
-		  row = {id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = ''} 
+		  row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = ''} 
 		  -- TODO : Sonderbehandlung für bilder ohne fullsize angabe
         end
         
@@ -269,97 +232,35 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         nnotfound = nnotfound +1
       end
   end
-  local str = inspect(notfound)
-  o2L(str)
-  local plugin = _PLUGIN
-  add2Cat(collection, searchDesc, foundph, plugin)
+  
+  add2Cat(collection, searchDesc, foundph)
+  LrTasks.sleep(nfound*0.5)
+  --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+  local photos = collection:getPhotos()
+  catalog:withWriteAccessDo( 'AddMetaData', function () 
+		for i, photo in ipairs( photos ) do 
+        if i > #foundph then
+          break
+        end
+        local phid = foundph[i].lrid
+        photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
+        local date = tostring(foundph[i].upldate)
+        date = iso8601ToTime(date)
+        date = LrDate.formatShortDate(date)
+        
+        photo:setPropertyForPlugin (_PLUGIN,'upldate', date)
+        photo:setPropertyForPlugin(_PLUGIN,'wpwidth', tostring(foundph[i].width))
+        photo:setPropertyForPlugin(_PLUGIN,'wpheight', tostring(foundph[i].height))
+        photo:setPropertyForPlugin(_PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+        photo:setPropertyForPlugin(_PLUGIN,'slug', tostring(foundph[i].slug))
+        photo:setPropertyForPlugin(_PLUGIN,'post', tostring(foundph[i].post))
+        photo:setPropertyForPlugin(_PLUGIN,'gallery', tostring(foundph[i].gallery) )
+       
+    end 
+  end )
   
   end -- if firtsync
 end -- function
-
--- collection or collection set rename callback
-function publishServiceProvider.renamePublishedCollection( publishSettings, info )
-  LrMobdebug.on()
-	o2L('call renamePublishedCollection')
-	local collection = info.publishedCollection
-	local newName = info.name
-	--local remoteID = collection:getRemoteId()
-	local remoteID = 99
-	local str = inspect(newName)
-  local catalog = LrApplication.activeCatalog()
-	o2L(str)
-	
-	--Debug.pauseIfAsked()
-  
-  local lrid = catalog:findPhotos {
-		searchDesc = {
-			criteria = "filename",
-			operation = "==",
-			value = 'Franken_2019_08-29.jpg' ,
-		}
-	} 
-
-	--Debug.pauseIfAsked()
-	catalog:withWriteAccessDo( 'AddtoWP', function () 
-		collection:addPhotos(lrid)
-		
-		--pubid:setEditedFlag(false)
-		--Debug.pauseIfAsked()
-	end)
-	
-	Log( "Rename: " .. collection:getName() .. " to " .. newName  )
-
-	if collection:type() == 'LrPublishedCollectionSet' then
-		Log( "Renaming set to: ", newName )
-		local result = Post( "album/rename", { aid = remoteID, name = newName }, publishSettings )
-		Log( "rename returns", result )
-	elseif collection:type() == 'LrPublishedCollection' then
-		Log( "Renaming collection 2: ", newName )
-		--local result = Post( "gallery/rename", { gid = remoteID, name = newName }, publishSettings )
-    local result = 'created!'
-		Log( "rename returns", result )
-	end
-	--Debug.pauseIfAsked()
-end
-
--- reparent collection or collection set callback
-function publishServiceProvider.reparentPublishedCollection( publishSettings, info )
-
-	local data = {}
-
-	local collection = info.publishedCollection
-	local thisRemoteId = collection:getRemoteId()
-
-	if #info.parents ~= 0 then 
-		local newRemoteParentId = info.parents[#info.parents].remoteCollectionId
-		local newRemoteParentName = info.parents[#info.parents].name
-
-		data.newparent = newRemoteParentId
-		Log( "new parent: ", data.newparent )
-	end
-
-	local parent = collection:getParent()
-	if parent ~= nil then 		-- not a root collection
-		data.parent = parent:getRemoteId()
-		Log( "old parent: ",  data.parent )
-	end
-
-	if collection:type() == 'LrPublishedCollectionSet' then
-
-		Log( "Reparenting set/album: ", thisRemoteId )
-		data.aid = thisRemoteId
-		local result = Post( "reparent", data, publishSettings )
-
-	elseif collection:type() == 'LrPublishedCollection' then
-
-		Log( "Reparenting collection/gallery: ", thisRemoteId )
-		data.gid = thisRemoteId
-		local result = Post( "reparent",  data, publishSettings )
-
-	end
-	--Debug.pauseIfAsked()
-
-end
 
 -- image delete callback.
 function publishServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
@@ -378,23 +279,6 @@ function publishServiceProvider.deletePhotosFromPublishedCollection( publishSett
 		--end
 
 	end
-end
--- called when a collection or collection set is deleted
-function publishServiceProvider.deletePublishedCollection( publishSettings, info  )
-
-	local collection = info.publishedCollection
-	local remoteID = collection:getRemoteId();
-	local collectionName = collection:getName()
-
-	-- ToDo: LR quits the op if there's even one failure. Need to delete all we can !! is this fixed??
-	if collection:type() == 'LrPublishedCollectionSet' then
-		Log( "Deleting set/album: ", remoteID )
-		local result = Post( "album/delete", { aid = remoteID, name = collectionName }, publishSettings )
-	elseif collection:type() == 'LrPublishedCollection' then
-		Log( "Deleting collection/gallery: ", remoteID )
-		local result = Post( "gallery/delete", { gid = remoteID, name = collectionName }, publishSettings )
-	end
-
 end
 
 -- called when  collection (gallery) is added or renamed.
@@ -477,7 +361,6 @@ LrMobdebug.on()
 	--end) -- lrTasks
 end
 
-publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 function publishServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
 
 	-- ToDo: LR gives an empty id sequence if count of images is 2 or less. Maybe
@@ -488,6 +371,5 @@ function publishServiceProvider.imposeSortOrderOnPublishedCollection( publishSet
 	end
 	local result = Post( "gallery/sort", { sequence = remoteIdSequence }, publishSettings )
 end
-
 
 return publishServiceProvider
