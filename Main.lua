@@ -1,15 +1,14 @@
---[[
-	Main entry point for plugin.
-]]
+--	Main entry point for plugin.
+
 local LrDialogs = import( 'LrDialogs' )
 local LrApplication = import( 'LrApplication' )
 local LrDate = import( 'LrDate' )
 local LrLogger = import 'LrLogger'
 local inspect = require 'inspect'
-local LrErrors = import 'LrErrors'
-local LrFtp = import 'LrFtp'
+--local LrErrors = import 'LrErrors'
+--local LrFtp = import 'LrFtp'
 local LrTasks = import 'LrTasks'
-local LrBinding = import 'LrBinding'
+--local LrBinding = import 'LrBinding'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrHttp = import( 'LrHttp' )
 local LrFileUtils = import('LrFileUtils')
@@ -33,18 +32,14 @@ require("helpers")
 local publishServiceProvider = {}
 
 publishServiceProvider.small_icon = "Small-icon.png"
-
 publishServiceProvider.supportsIncrementalPublish = 'only'							-- only publish. No export facility
 publishServiceProvider.allowFileFormats = { 'JPEG' } 								-- jpeg only
 publishServiceProvider.hidePrintResolution = true									-- hide print res controls
 publishServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
 publishServiceProvider.hideSections = { 'exportLocation' }							-- hide export location
-
 publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- see process.lua
-
 publishServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua
 publishServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog
-
 publishServiceProvider.exportPresetFields = {
 	{ key = "siteURL", default = "" },
 	{ key = "loginName", default = "" },
@@ -53,12 +48,11 @@ publishServiceProvider.exportPresetFields = {
 	{ key = "pwdok", default = "false"},
 	{ key = "urlreadable", default = false},
 }
-
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
 local function GetMedia( publishSettings, perpage, page ) 
-	local hash = 'Basic ' .. publishSettings.hash 
+	local hash = 'Basic ' .. publishSettings.hash -- TODO : Auswahl im Menu
 	local httphead = {
       {field='Authorization', value=hash},
     }
@@ -92,36 +86,52 @@ local function add2Cat (collection, search, photos)
     for i=1,len do
       local lrid = catalog:findPhotos {
         searchDesc = {search[i],
-        combine = "union"}
+         { criteria = "copyname", -- selektiert die Kopien aus
+           operation = "noneOf",
+           value = "Kopie", -- TODO: International?
+         }, 
+        combine = "intersect"}
       }
-      photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
-
-      if photos[i].filen == 'Mallorca_2015_03-33_PC2.jpg'then
-        local test = 'dfsd'
-      end
-
+      --if photos[i].filen == 'Spanien_2016_06-963.jpg' then
+       -- local b  = '3'
+      --end
+      
       if lrid[2] ~= nil then
         local label = {} 
-        local copy = {}
         local sel = 0
         local nred = 0
+        local csel = 0
+        local ncol = 0
+        local coll
+        local pubcoll
+        
         for k, ph in ipairs(lrid) do
           label[k] = ph:getFormattedMetadata('label')
           if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
             sel = k
             nred = nred +1
           end
-          copy[k] =  ph:getFormattedMetadata('copyName')
+          coll = ph:getContainedCollections()
+          pubcoll = ph:getContainedPublishedCollections()
+          if ((coll ~= nil) or (pubcoll ~= nil)) then
+            csel = k
+            ncol = ncol +1
+          end
+          
         end
         
         if nred == 1 then
-          selphoto = lrid[sel]
+          selphoto = {lrid[sel]}
           lrid = selphoto
-          --photos[i].lrid = lrid
+        elseif ncol == 1 then
+          selphoto = {lrid[csel]}
+          lrid = selphoto
         end
         
       end
       
+      photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+
       catalog:withWriteAccessDo( 'AddtoWP', function () 
 		    collection:addPhotos(lrid)
 		  end ) 
@@ -139,7 +149,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local result
   local mediatable = {}
   local len = 0
-  local perpage = 50
+  local perpage = 100
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
@@ -183,7 +193,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        break -- nur für Testzwecke: zum vozeitigen Abbruch
+        --break -- nur für Testzwecke: zum vozeitigen Abbruch
       else
         getmore = false
       end
@@ -256,12 +266,13 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         nnotfound = nnotfound +1
       end
   end
-  
+  local str = inspect(notfound)
+  o2L(str)
   add2Cat(collection, searchDesc, foundph)
-  --LrTasks.sleep(nfound*0.5)
+  LrTasks.sleep(nfound*0.5)
   
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-  --[[
+  
   catalog:withWriteAccessDo( 'AddMetaData', function () 
     for i=1, nfound-1 do
         if i > #foundph then
@@ -286,7 +297,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
        
     end 
   end ) -- catalog:withWriteAccessDo
-  ]]
+  
   end -- if firtsync
 end -- function
 
