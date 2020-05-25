@@ -5,54 +5,56 @@ local LrApplication = import( 'LrApplication' )
 local LrDate = import( 'LrDate' )
 local LrLogger = import 'LrLogger'
 local inspect = require 'inspect'
---local LrErrors = import 'LrErrors'
---local LrFtp = import 'LrFtp'
 local LrTasks = import 'LrTasks'
---local LrBinding = import 'LrBinding'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrHttp = import( 'LrHttp' )
 local LrFileUtils = import('LrFileUtils')
+local LrProgressScope = import( 'LrProgressScope' )
 
+----- Debug -------------
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
-
 local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
 local function o2L( message )
 	myLogger:trace( message )
 end
+require 'Logger'
+----- Debug ------------
 
 JSON=require 'JSON'
 require 'Dialogs'
 require 'Post'
 require 'Process'
-require 'Logger'
 require("helpers")
 
 local publishServiceProvider = {}
 
 publishServiceProvider.small_icon = "Small-icon.png"
 publishServiceProvider.supportsIncrementalPublish = 'only'							-- only publish. No export facility
-publishServiceProvider.allowFileFormats = { 'JPEG' } 								-- jpeg only
+publishServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben
 publishServiceProvider.hidePrintResolution = true									-- hide print res controls
 publishServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
 publishServiceProvider.hideSections = { 'exportLocation' }							-- hide export location
-publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- see process.lua
+publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- TODO: see process.lua
 publishServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua
-publishServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog
+publishServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog -- see dialogs.lua
 publishServiceProvider.exportPresetFields = {
 	{ key = "siteURL", default = "" },
 	{ key = "loginName", default = "" },
 	{ key = "loginPassword", default = "" },
 	{ key = "hash", default = ""},
 	{ key = "pwdok", default = "false"},
-	{ key = "urlreadable", default = false},
+  { key = "urlreadable", default = false},
+  { key = "firstsync", default = false},
 }
 publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
+-- Get all Media Files from WP-Media-Catalog via REST-API
+-- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown
 local function GetMedia( publishSettings, perpage, page ) 
-	local hash = 'Basic ' .. publishSettings.hash -- TODO : Auswahl im Menu
+	local hash = 'Basic ' .. publishSettings.hash
 	local httphead = {
       {field='Authorization', value=hash},
     }
@@ -74,8 +76,11 @@ local function GetMedia( publishSettings, perpage, page )
   return result
  end
 
-
-local function add2Cat (collection, search, photos)
+-- Serch pre-selected Images in LR Database, exclude Copies, marked by "Kopie.."
+-- special selection if more then on photo found. Selector: "Rot"
+-- This runs as asynchronous Task! Main Task has to wait. No Signalling between Takks.
+-- add found photos to WP-LR-Sync-Collection
+local function addToWPColl (collection, search, photos)
   
   LrTasks.startAsyncTask(function ()
     LrMobdebug.on()
@@ -90,20 +95,18 @@ local function add2Cat (collection, search, photos)
            operation = "noneOf",
            value = "Kopie", -- TODO: International?
          }, 
-        combine = "intersect"}
+        combine = "intersect"} -- UND-Verknüpfung der Kriterien
       }
-      --if photos[i].filen == 'Spanien_2016_06-963.jpg' then
-       -- local b  = '3'
-      --end
-      
+    
+      --------- Auswahl bei mehr als einem gefundenen Foto
       if lrid[2] ~= nil then
         local label = {} 
         local sel = 0
         local nred = 0
         local csel = 0
         local ncol = 0
-        local coll
-        local pubcoll
+        local coll = {}
+        local pubcoll = {}
         
         for k, ph in ipairs(lrid) do
           label[k] = ph:getFormattedMetadata('label')
@@ -111,9 +114,9 @@ local function add2Cat (collection, search, photos)
             sel = k
             nred = nred +1
           end
-          coll = ph:getContainedCollections()
-          pubcoll = ph:getContainedPublishedCollections()
-          if ((coll ~= nil) or (pubcoll ~= nil)) then
+          coll[k] = ph:getContainedCollections()
+          pubcoll[k] = ph:getContainedPublishedCollections()
+          if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
             csel = k
             ncol = ncol +1
           end
@@ -153,6 +156,10 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
+
+  local pscope = LrProgressScope( {
+    title = "First Sync WP with LR. Please Wait!",
+  })
   
   if #nphotos == 0 then
     firstsync = true -- TODO: noch als globale Variable definieren
@@ -193,28 +200,31 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        --break -- nur für Testzwecke: zum vozeitigen Abbruch
+        --break -- nur für Testzwecke: zum vozeitigen Abbruch : Debug
       else
         getmore = false
       end
       
     end
-	--LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
-  
+ 
+   --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
+   pscope:setPortionComplete(0.2)
+
   local foundph = {}
   local notfound = {}
   local nfound = 1
   local nnotfound = 1
   local searchDesc = {}
   local p = string.gsub( plugpath,"\\","/")
-   
+  local pscopeadd = (0.65 - 0.2) / #mediatable
+
   for i=1,#mediatable do
       local filen = mediatable[i].filen
       local success = false
       local lrid
-      if filen:find('Bretagne_10_08_346',1,true) then
-        --o2L('found')
-      end
+      --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
+      --  local b = '3'
+      --end
       
       if #filen > 3 then
       -- suche mit Dateiname aus WP
@@ -226,7 +236,13 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         if lrid == nil then
           success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
+          if #lrid > 3 then 
+            o2L('found mit origiFilen')
+            o2L(filen)
+          end
           if #lrid > 9 then 
+            o2L('mehrfach')
+            o2L(lrid)
             lrid = string.sub(lrid,1,7) 
           end
           lrid = tonumber(lrid)
@@ -265,13 +281,15 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         notfound[nnotfound] = mediatable[i]
         nnotfound = nnotfound +1
       end
+      pscope:setPortionComplete(0.2 + i * pscopeadd)
   end
-  local str = inspect(notfound)
-  o2L(str)
-  add2Cat(collection, searchDesc, foundph)
-  LrTasks.sleep(nfound*0.5)
+  pscope:setPortionComplete(0.65)
   
-  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+  addToWPColl(collection, searchDesc, foundph) -- TODO: Hinweis wenn fotos nicht gefunden wurden
+  
+  --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+  pscope:setPortionComplete(0.8)
+  LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
   
   catalog:withWriteAccessDo( 'AddMetaData', function () 
     for i=1, nfound-1 do
@@ -298,12 +316,26 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
     end 
   end ) -- catalog:withWriteAccessDo
   
+  for i=1,#foundph do
+    if foundph[i].lrid[1] == nil then
+      --notfound[nnotfound] = foundph[i]
+      table.insert(notfound,foundph[i])
+      nnotfound = nnotfound +1
+    end
+  end
+  csvwrite(p .. '/notfound.csv',notfound) -- TODO: richtigen Pfad einsetzen
+  
+  pscope:done()
+  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+  
   end -- if firtsync
 end -- function
 
 -- image delete callback.
 function publishServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
-
+-- REST-API mit Auth und Force zum Löschen
+-- Foto aus der Sammlung entfernen
+-- Metdaten aus dem Foto löschen
 	for i, photoId in ipairs( arrayOfPhotoIds ) do
 
 		Log( string.format( "Deleting id: %d", photoId ));
@@ -321,6 +353,7 @@ function publishServiceProvider.deletePhotosFromPublishedCollection( publishSett
 end
 
 -- called when  collection (gallery) is added or renamed.
+-- hier gibt es wahrsch. keine Funktion
 function publishServiceProvider.updateCollectionSettings( publishSettings, info )
   LrMobdebug.on()
 	local data = {}		-- the data table we'll be sending to WP
@@ -359,6 +392,7 @@ function publishServiceProvider.updateCollectionSettings( publishSettings, info 
 end
 
 -- called when a publish collection set (album) is added or changed. (renamed)
+-- hier gibt es wahrsch. keine Funktion
 function publishServiceProvider.updateCollectionSetSettings( publishSettings, info ) 
 	Log( "update Collection Set Settings, creating new album", info.publishedCollection )
 LrMobdebug.on()
@@ -400,6 +434,8 @@ LrMobdebug.on()
 	--end) -- lrTasks
 end
 
+-- sort order als Variable im PHP in WP einstellen:
+-- hier gibt es also wahrsch. keine Funktion)
 function publishServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
 
 	-- ToDo: LR gives an empty id sequence if count of images is 2 or less. Maybe

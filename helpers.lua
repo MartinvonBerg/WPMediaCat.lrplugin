@@ -52,3 +52,21 @@ function iso8601ToTime(dateTimeISO8601)
 									 tonumber(ifnil(hour, "0")), tonumber(ifnil(minute, "0")), tonumber(ifnil(second, "0")),
 									 iif(ifnil(tzone, '') == '', "local", tzone))
 end
+
+function csvwrite(path, data, sep)
+	  sep = sep or ','
+	  local file = assert(io.open(path, "w"))
+	  for i=1,#data do
+		  local j = 1
+		  for key,coll in pairs(data[i]) do
+			  if j>1 then file:write(sep) end
+			  if type(coll) == 'table' then
+				coll = tostring(coll[1])
+			  end
+			  file:write(coll)
+			  j = j +1
+		  end
+		  file:write('\n')
+	  end
+	  file:close()
+  end
