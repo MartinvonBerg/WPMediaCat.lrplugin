@@ -1,4 +1,5 @@
 local LrDate = import( 'LrDate' )
+
 ------------ helper functions --------------------------------------------
 function SplitFilename(strFilename)
 	-- Returns the baseFilename, and Extension as 2 values
@@ -6,6 +7,7 @@ function SplitFilename(strFilename)
 end
 
 function replhyphen(filen)
+	-- replhyphen '-' with underscore '_' in string
 	filen = filen:reverse()
 	local nfound = 0
 	local newstring = filen
@@ -54,6 +56,7 @@ function iso8601ToTime(dateTimeISO8601)
 end
 
 function csvwrite(path, data, sep)
+	-- write csv-file data to path with given seperator sep
 	  sep = sep or ','
 	  local file = assert(io.open(path, "w"))
 	  for i=1,#data do
@@ -70,3 +73,81 @@ function csvwrite(path, data, sep)
 	  end
 	  file:close()
   end
+
+function getfile(path, sep)
+	-- get filename of Path (the value after the last '/')
+	sep = sep or '/'
+	path = path:reverse()
+	local index = 0
+
+	for i = 1, path:len() do
+	local letter = path:sub(i,i ) 
+		if (letter == sep) then
+			--print (index)
+			index = i
+			--print (index)
+			break
+		end
+	end
+	path = path:sub(1,index-1)
+	path = path:reverse()
+	--outputToLog(path)
+	return path
+end
+
+function strsplit(string, sSeparator, nMax, bRegexp)
+	-- split string by given seperator
+    if sSeparator == '' then
+        sSeparator = ','
+    end
+
+    if nMax and nMax < 1 then
+        nMax = nil
+    end
+
+    local aRecord = {}
+
+    if string:len() > 0 then
+        local bPlain = not bRegexp
+        nMax = nMax or -1
+
+        local nField, nStart = 1, 1
+        local nFirst,nLast = string:find(sSeparator, nStart, bPlain)
+        while nFirst and nMax ~= 0 do
+            aRecord[nField] = string:sub(nStart, nFirst-1)
+            nField = nField+1
+            nStart = nLast+1
+            nFirst,nLast = string:find(sSeparator, nStart, bPlain)
+            nMax = nMax-1
+        end
+        aRecord[nField] = string:sub(nStart)
+    end
+
+    return aRecord
+end
+
+---------------------------------------------------------------------
+function sqlread(path, sep, tonum, null)
+	-- read sqlite3.exe result to table, result stored in *.txt, seperated by '|'
+    tonum = tonum or true
+    sep = sep or ','
+    null = null or ''
+    local csvFile = {}
+    local fields = {}
+    local file = assert(io.open(path, "r"))
+    for line in file:lines() do
+        fields = strsplit(line, sep)
+        if tonum then -- convert numeric fields to numbers
+            for i=1,#fields do
+                local field = fields[i]
+                if field == '' then
+                    field = null
+                end
+                fields[i] = tonumber(field) or field
+            end
+        end
+        table.insert(csvFile, fields)
+    end
+    file:close()
+    return csvFile
+end

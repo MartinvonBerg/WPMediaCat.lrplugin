@@ -1,17 +1,32 @@
+----- Debug -------------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict"
+--require "strict.lua"
+----- Debug ------------
+
 --	Main entry point for plugin.
 
-local LrDialogs = import( 'LrDialogs' )
-local LrApplication = import( 'LrApplication' )
-local LrDate = import( 'LrDate' )
+local LrDialogs = import 'LrDialogs'
+local LrFileUtils = import 'LrFileUtils'
+local LrPathUtils = import 'LrPathUtils'
+local LrView = import 'LrView'
+local LrHttp = import 'LrHttp'
 local LrLogger = import 'LrLogger'
-local inspect = require 'inspect'
+--local LrXml = import 'LrXml'
+local LrDate = import 'LrDate'
+--local LrErrors = import 'LrErrors'
+--local LrFtp = import 'LrFtp'
 local LrTasks = import 'LrTasks'
-local LrFunctionContext = import 'LrFunctionContext'
-local LrHttp = import( 'LrHttp' )
-local LrFileUtils = import('LrFileUtils')
-local LrProgressScope = import( 'LrProgressScope' )
+local bind = LrView.bind
+local share = LrView.share
 
------ Debug -------------
+JSON=require 'JSON'
+require 'Dialogs'
+require 'Post'
+--require 'Process'
+require("helpers")
+
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local myLogger = LrLogger( 'WPSynclog' )
@@ -19,27 +34,19 @@ myLogger:enable( "logfile" )
 local function o2L( message )
 	myLogger:trace( message )
 end
-require 'Logger'
------ Debug ------------
 
-JSON=require 'JSON'
-require 'Dialogs'
-require 'Post'
-require 'Process'
-require("helpers")
-
-local publishServiceProvider = {}
-
-publishServiceProvider.small_icon = "Small-icon.png"
-publishServiceProvider.supportsIncrementalPublish = 'only'							-- only publish. No export facility
-publishServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben
-publishServiceProvider.hidePrintResolution = true									-- hide print res controls
-publishServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
-publishServiceProvider.hideSections = { 'exportLocation' }							-- hide export location
-publishServiceProvider.processRenderedPhotos = processRenderedPhotos				-- TODO: see process.lua
-publishServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua
-publishServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog -- see dialogs.lua
-publishServiceProvider.exportPresetFields = {
+------------ exportServiceProvider ----------------------------
+exportServiceProvider = {}
+exportServiceProvider.small_icon = "Small-icon.png"
+exportServiceProvider.supportsIncrementalPublish = 'only'							-- only publish. No export facility
+exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
+exportServiceProvider.hidePrintResolution = true									-- hide print res controls
+exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
+exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo' }							-- hide export location
+--exportServiceProvider.processRenderedPhotos = processRenderedPhotos				-- TODO: see process.lua, integrieren oder umbenennen wie bei ftp-task
+exportServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
+exportServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog -- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
+exportServiceProvider.exportPresetFields = {
 	{ key = "siteURL", default = "" },
 	{ key = "loginName", default = "" },
 	{ key = "loginPassword", default = "" },
@@ -48,12 +55,13 @@ publishServiceProvider.exportPresetFields = {
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
 }
-publishServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
-publishServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
+exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
+exportServiceProvider.titleForGoToPublishedPhoto = 'Go to Foto in WP Catalog'
+exportServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
 -- Get all Media Files from WP-Media-Catalog via REST-API
--- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown
-local function GetMedia( publishSettings, perpage, page ) 
+-- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
+function GetMedia( publishSettings, perpage, page ) 
 	local hash = 'Basic ' .. publishSettings.hash
 	local httphead = {
       {field='Authorization', value=hash},
@@ -80,10 +88,10 @@ local function GetMedia( publishSettings, perpage, page )
 -- special selection if more then on photo found. Selector: "Rot"
 -- This runs as asynchronous Task! Main Task has to wait. No Signalling between Takks.
 -- add found photos to WP-LR-Sync-Collection
-local function addToWPColl (collection, search, photos)
+function addToWPColl (collection, search, photos)
   
   LrTasks.startAsyncTask(function ()
-    LrMobdebug.on()
+    --LrMobdebug.on()
     local catalog = LrApplication.activeCatalog()
     local len = #search
     local selphoto
@@ -93,7 +101,7 @@ local function addToWPColl (collection, search, photos)
         searchDesc = {search[i],
          { criteria = "copyname", -- selektiert die Kopien aus
            operation = "noneOf",
-           value = "Kopie", -- TODO: International?
+           value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
          }, 
         combine = "intersect"} -- UND-Verknüpfung der Kriterien
       }
@@ -143,8 +151,9 @@ local function addToWPColl (collection, search, photos)
   
 end
 
-function publishServiceProvider.goToPublishedCollection( publishSettings, info )
-  LrMobdebug.on()
+function exportServiceProvider.goToPublishedCollection( publishSettings, info )
+  --LrMobdebug.on()
+  o2L('goToPublishedCollection aufgerufen')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos()
@@ -162,7 +171,8 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   })
   
   if #nphotos == 0 then
-    firstsync = true -- TODO: noch als globale Variable definieren
+    firstsync = true 
+    publishSettings.firstsync = true
   end
    
   if (firstsync == true and publishSettings.urlreadable == true) then
@@ -186,11 +196,12 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
 		end
 		
         if keyfound then
-          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
         else
-		  row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].media_details.gallery, phurl = result[i].source_url, filen = ''} 
-		  -- TODO : Sonderbehandlung für bilder ohne fullsize angabe
-        end
+          local fname = result[i].media_details.file
+          fname = getfile(fname)
+          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = fname} 
+		    end
         
         local index = runs * perpage + i
         mediatable[index] = row
@@ -222,36 +233,51 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       local filen = mediatable[i].filen
       local success = false
       local lrid
-      --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
-      --  local b = '3'
-      --end
+      if filen:find('Chile09_0322',1,true) then -- _1179 _1259
+        local b = '3'
+      end
       
       if #filen > 3 then
-      -- suche mit Dateiname aus WP
-        success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
+      -- suche mit Dateiname aus WP -- TODO: Pfad zum echten und aktiven LR-cat verwenden!
+        success = LrTasks.execute( p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
         lrid = LrFileUtils.readFile( p ..'/test.txt' )
         if #lrid > 9 then lrid = string.sub(lrid,1,7) end
         lrid = tonumber(lrid)
       
-        if lrid == nil then
-          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
-          lrid = LrFileUtils.readFile( p ..'/test.txt' )
-          if #lrid > 3 then 
-            o2L('found mit origiFilen')
-            o2L(filen)
+        if lrid == nil then 
+          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          local sqltab = {}
+          sqltab = sqlread( p .. "/test.txt", '|')
+                    
+          if #sqltab == 1 then -- einmal gefunden
+            lrid = sqltab[1][1] 
+            
+          elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
+            local csel = 0
+            local ncol = 0
+            
+            for m=1,#sqltab do
+              local id = tostring(sqltab[m][1] - 1)
+              success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
+              local label = LrFileUtils.readFile( p ..'/collabel.txt' )
+              --Wenn CololLabel == 'Rot' dann filen = idx_filename
+              if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
+                csel = m
+                ncol = ncol +1
+              end
+            end -- for
+            
+            if ncol == 1 then
+              lrid = sqltab[csel][1]
+              filen = sqltab[csel][2]
+            end
           end
-          if #lrid > 9 then 
-            o2L('mehrfach')
-            o2L(lrid)
-            lrid = string.sub(lrid,1,7) 
-          end
-          lrid = tonumber(lrid)
-        end
+        end -- end if lrid
         
         if lrid == nil then
           local base, ext = SplitFilename(filen)
           if base ~= nil then
-            success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where baseName like '" .. base .."%'\" > " .. p .. "/test.txt") 
+            success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
@@ -274,7 +300,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
       end
     
       if lrid ~=nil then
-        foundph[nfound] = mediatable[i] -- TODO : Sonderbehandlung wenn filen = ''
+        foundph[nfound] = mediatable[i] 
         searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
         nfound = nfound +1
       else
@@ -285,7 +311,7 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   end
   pscope:setPortionComplete(0.65)
   
-  addToWPColl(collection, searchDesc, foundph) -- TODO: Hinweis wenn fotos nicht gefunden wurden
+  addToWPColl(collection, searchDesc, foundph) 
   
   --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
   pscope:setPortionComplete(0.8)
@@ -301,10 +327,11 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
         for j, photo in ipairs(photos) do
           local date = tostring(foundph[i].upldate)
           date = iso8601ToTime(date)
-          date = LrDate.formatShortDate(date)
+          local dateday = LrDate.formatShortDate(date)
+          local datetime = LrDate.formatMediumTime( date )
 
           photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
-          photo:setPropertyForPlugin( _PLUGIN,'upldate', date)
+          photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
           photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
           photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
           photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
@@ -318,44 +345,52 @@ function publishServiceProvider.goToPublishedCollection( publishSettings, info )
   
   for i=1,#foundph do
     if foundph[i].lrid[1] == nil then
-      --notfound[nnotfound] = foundph[i]
       table.insert(notfound,foundph[i])
       nnotfound = nnotfound +1
     end
   end
-  csvwrite(p .. '/notfound.csv',notfound) -- TODO: richtigen Pfad einsetzen
+  local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+  csvwrite(p2 .. '/notfound.csv',notfound) 
   
   pscope:done()
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+
+  -- TODO: Download der nicht gefundenen bilder zum Katalog
+  -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
+  -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
+  -- Metadaten wie auch bei den gefundenen Fotos setzen
   
   end -- if firtsync
 end -- function
-
+--[[
 -- image delete callback.
-function publishServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
+function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
 -- REST-API mit Auth und Force zum Löschen
 -- Foto aus der Sammlung entfernen
 -- Metdaten aus dem Foto löschen
+  o2l('deletePhotosFromPublishedCollection call')
 	for i, photoId in ipairs( arrayOfPhotoIds ) do
 
 		Log( string.format( "Deleting id: %d", photoId ));
-		local result = Post( "image/delete",  { pid = photoId }, publishSettings )
+		--local result = Post( "image/delete",  { pid = photoId }, publishSettings )
 		
 		-- call the delete callback even if it fails on the Wordpress end
 		-- ToDo: Need to fix it so REST doesn't return an error if the delete fails
 		--			there's still a potential conflict here if the image is out of
 		--			kilter between the server and the local.
 		--if result ~= nil then
-			deletedCallback( photoId )
+			--deletedCallback( photoId )
 		--end
 
 	end
 end
 
--- called when  collection (gallery) is added or renamed.
+ called when  collection (gallery) is added or renamed.
 -- hier gibt es wahrsch. keine Funktion
-function publishServiceProvider.updateCollectionSettings( publishSettings, info )
-  LrMobdebug.on()
+function exportServiceProvider.updateCollectionSettings( publishSettings, info )
+  --LrMobdebug.on()
+  o2L('updateCollectionSetSettings call')
+  Log( "update Collection Set Settings, creating new album", info.publishedCollection )
 	local data = {}		-- the data table we'll be sending to WP
 
 	local collection = info.publishedCollection
@@ -393,9 +428,9 @@ end
 
 -- called when a publish collection set (album) is added or changed. (renamed)
 -- hier gibt es wahrsch. keine Funktion
-function publishServiceProvider.updateCollectionSetSettings( publishSettings, info ) 
+function exportServiceProvider.updateCollectionSetSettings( publishSettings, info ) 
 	Log( "update Collection Set Settings, creating new album", info.publishedCollection )
-LrMobdebug.on()
+--LrMobdebug.on()
 	--LrTasks.startAsyncTask( function()
 
 		local data = {}		-- the data table we'll be sending to WP
@@ -432,19 +467,100 @@ LrMobdebug.on()
 		end
 	
 	--end) -- lrTasks
-end
+end 
 
 -- sort order als Variable im PHP in WP einstellen:
 -- hier gibt es also wahrsch. keine Funktion)
-function publishServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
-
+function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
+  o2L('imposeSortOrderOnPublishedCollection call')
 	-- ToDo: LR gives an empty id sequence if count of images is 2 or less. Maybe
 	-- why 2??
 	if #remoteIdSequence == 0 then
 		Log( "Sort: zero length id sequence. Nothing to sort")
 		return
 	end
-	local result = Post( "gallery/sort", { sequence = remoteIdSequence }, publishSettings )
+	--local result = Post( "gallery/sort", { sequence = remoteIdSequence }, publishSettings )
 end
 
-return publishServiceProvider
+
+-- direkten Login in die Medien-Bibliothek öffnen
+function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
+  o2L('goToPublishedPhoto call')
+--(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
+end
+]]
+-- publish Photos -- processRenderedPhotos
+function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
+  o2L('processRenderedPhotos aufgerufen')
+  
+  --Debug.pauseIfAsked()
+  LrMobdebug.on()
+  --local LrExportSession = import 'LrExportSession' 
+	local exportSession = exportContext.exportSession
+  local exportSettings = exportContext.propertyTable
+	local nPhotos = exportSession:countRenditions()
+  local exportParams = exportSettings
+	local publishedCollectionInfo = exportContext.publishedCollectionInfo
+  local rend = exportContext.renditions
+  local uploadedPhotoIds = {}
+  --Debug.pauseIfAsked()
+  --[[
+  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
+
+		local photo = rendition.photo
+
+		if not rendition.wasSkipped then
+
+			local success, pathOrMessage = rendition:waitForRender()
+      if success then
+        local ImageID = 0-- published before? 
+        if ImageID then -- replace image
+						
+        else -- new image
+						ImageID  = 111 -- set to wpid
+        end
+        rendition:recordPublishedPhotoId( ImageID )
+      end
+      
+    end
+  end
+  ]]
+end
+
+function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
+  o2L('getCollectionBehaviorInfo call')
+  -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen
+	--outputToLog('getCollectionBehaviorInfo aufgerufen')
+	
+	return {
+		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
+		defaultCollectionCanBeDeleted = false,
+		canAddCollection = true,
+		maxCollectionSetDepth = 0,
+	}
+	
+end
+
+function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
+	--outputToLog('metadataThatTriggersRepublish aufgerufen')
+	return {
+
+		default = true,
+		title = true,
+		caption = true,
+		keywords = true,
+		gps = true,
+		dateCreated = false,
+		copyright = true,
+		headline = true,
+		instructions = true,
+		label = true,
+		provider = true,
+		rating = false,
+		source = true,
+		imagedate = true,
+	}
+
+end
+
+return exportServiceProvider

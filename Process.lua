@@ -9,12 +9,24 @@ local LrDialogs = import 'LrDialogs'
 local LrStringUtils = import 'LrStringUtils'
 local LrErrors = import 'LrErrors'
 local LrTasks = import 'LrTasks'
+local LrLogger = import 'LrLogger'
 
+----- Debug -------------
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
+local myLogger = LrLogger( 'WPSynclog' )
+myLogger:enable( "logfile" )
+local function o2L( message )
+	myLogger:trace( message )
+end
+require 'Logger'
+----- Debug ------------
 
 function processRenderedPhotos( functionContext, exportContext )
-
+  LrMobdebug.on()
 	local exportSession = exportContext.exportSession
 	local nPhotos = exportSession:countRenditions()
+	--local firstsync = publishSettings.firstsync
 
 	local progressScope = exportContext:configureProgress {
 		title = nPhotos > 1

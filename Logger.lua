@@ -1,6 +1,6 @@
 local LrLogger = import "LrLogger"
 
-local Logger = LrLogger( "NgPlusPlus_Log" ) 
+local Logger = LrLogger( "WP_MediaCat2" ) 
 
 -- log to logfile in ~/Documents/My Documents. Change this to 'print' to log to console
 Logger:enable( "logfile" )

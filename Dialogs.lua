@@ -7,8 +7,8 @@ local inspect = require 'inspect'
 
 dialogs = {}
 
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
  
 -- Global login settings. Updated by the observer set up in startDialogs
 
@@ -98,7 +98,6 @@ function EntryBox( f, title, bound)
 
 	local bind = LrView.bind
 	local share = LrView.share
-
 
 	return f:row {
 		fill_horizontal = true,
