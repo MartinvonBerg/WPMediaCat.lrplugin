@@ -21,11 +21,11 @@ local LrTasks = import 'LrTasks'
 local bind = LrView.bind
 local share = LrView.share
 
-JSON=require 'JSON'
+--JSON=require 'JSON'
 require 'Dialogs'
-require 'Post'
+--require 'Post'
 --require 'Process'
-require("helpers")
+--require("helpers")
 
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
@@ -37,12 +37,14 @@ end
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
+exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.supportsIncrementalPublish = 'only'							-- only publish. No export facility
+exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo' } -- exportLocation erzeugt den Reiter "Speicherort für Export"
 exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
+exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
 exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
-exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo' }							-- hide export location
+exportServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 --exportServiceProvider.processRenderedPhotos = processRenderedPhotos				-- TODO: see process.lua, integrieren oder umbenennen wie bei ftp-task
 exportServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
 exportServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog -- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
@@ -57,8 +59,63 @@ exportServiceProvider.exportPresetFields = {
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Go to Foto in WP Catalog'
-exportServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
 
+
+------------ exportServiceProvider ----------------------------
+
+
+
+
+exportServiceProvider.canExportVideo = false 
+exportServiceProvider.supportsCustomSortOrder = true
+exportServiceProvider.disableRenamePublishedCollection = false -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
+exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
+------------ exportServiceProvider ----------------------------
+
+-- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. Bug : rendition is empty
+-- aber nPhotos is korrekt
+function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
+  o2L('processRenderedPhotos aufgerufen')
+  
+  --Debug.pauseIfAsked()
+  LrMobdebug.on()
+  local LrExportSession = import 'LrExportSession' 
+	local exportSession = exportContext.exportSession
+  local exportSettings = exportContext.propertyTable
+	local nPhotos = exportSession:countRenditions()
+  local exportParams = exportSettings
+	local publishedCollectionInfo = exportContext.publishedCollectionInfo
+  local rend = exportContext.renditions
+  local uploadedPhotoIds = {}
+  local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2'
+  --Debug.pauseIfAsked()
+  
+  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
+
+    local success, pathOrMessage = rendition:waitForRender()
+    local photo = rendition.photo
+
+		
+
+			
+      if success then
+        local filename = LrPathUtils.leafName( pathOrMessage )
+        local ImageID = 'WPSync' .. tostring(1000+i)-- published before? 
+        --local ImageID = photo:getPropertyForPlugin( myPluginId, 'wpid' ) 
+        if ImageID then -- replace image
+						
+        else -- new image
+						ImageID  = 111 -- set to wpid
+        end
+        rendition:recordPublishedPhotoId( ImageID )
+      end
+      
+    
+  end
+  
+end
+
+--[[
 -- Get all Media Files from WP-Media-Catalog via REST-API
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 function GetMedia( publishSettings, perpage, page ) 
@@ -362,7 +419,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   
   end -- if firtsync
 end -- function
---[[
+
 -- image delete callback.
 function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
 -- REST-API mit Auth und Force zum Löschen
@@ -488,44 +545,6 @@ function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
   o2L('goToPublishedPhoto call')
 --(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
 end
-]]
--- publish Photos -- processRenderedPhotos
-function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
-  o2L('processRenderedPhotos aufgerufen')
-  
-  --Debug.pauseIfAsked()
-  LrMobdebug.on()
-  --local LrExportSession = import 'LrExportSession' 
-	local exportSession = exportContext.exportSession
-  local exportSettings = exportContext.propertyTable
-	local nPhotos = exportSession:countRenditions()
-  local exportParams = exportSettings
-	local publishedCollectionInfo = exportContext.publishedCollectionInfo
-  local rend = exportContext.renditions
-  local uploadedPhotoIds = {}
-  --Debug.pauseIfAsked()
-  --[[
-  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
-
-		local photo = rendition.photo
-
-		if not rendition.wasSkipped then
-
-			local success, pathOrMessage = rendition:waitForRender()
-      if success then
-        local ImageID = 0-- published before? 
-        if ImageID then -- replace image
-						
-        else -- new image
-						ImageID  = 111 -- set to wpid
-        end
-        rendition:recordPublishedPhotoId( ImageID )
-      end
-      
-    end
-  end
-  ]]
-end
 
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   o2L('getCollectionBehaviorInfo call')
@@ -562,5 +581,5 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 	}
 
 end
-
+]]
 return exportServiceProvider

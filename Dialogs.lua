@@ -70,9 +70,6 @@ end
 function dialogs.startDialog( propertyTable )
 
 	propertyTable:addObserver( 'siteURL', checkURL )
-	--propertyTable:addObserver( 'loginName', updateLogins )
-	-- propertyTable:addObserver( 'loginPassword', updateLogins )
-	
 
 end
 
@@ -90,10 +87,8 @@ function checkURL( propertyTable )
 		--LrDialogs.message( str, "", "warning" )
 	end	
 	propertyTable.msgBox = str
-
-
-
 end
+
 function EntryBox( f, title, bound)
 
 	local bind = LrView.bind
