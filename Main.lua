@@ -1,39 +1,42 @@
------ Debug -------------
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
---require "strict"
---require "strict.lua"
------ Debug ------------
-
 --	Main entry point for plugin.
 
 local LrDialogs = import 'LrDialogs'
+local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
 local LrView = import 'LrView'
 local LrHttp = import 'LrHttp'
 local LrLogger = import 'LrLogger'
---local LrXml = import 'LrXml'
 local LrDate = import 'LrDate'
+local LrTasks = import 'LrTasks'
+local LrProgressScope = import( 'LrProgressScope' )
+local LrFunctionContext = import 'LrFunctionContext'
 --local LrErrors = import 'LrErrors'
 --local LrFtp = import 'LrFtp'
-local LrTasks = import 'LrTasks'
-local bind = LrView.bind
-local share = LrView.share
+--local LrXml = import 'LrXml'
+--local bind = LrView.bind
+--local share = LrView.share
 
---JSON=require 'JSON'
+JSON=require 'JSON'
 require 'Dialogs'
---require 'Post'
 --require 'Process'
---require("helpers")
+require 'helpers'
+require 'Logger'
 
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+----- Debug -----------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict"
+--require "strict.lua"
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
+local inspect = require 'inspect'
 local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
 local function o2L( message )
 	myLogger:trace( message )
 end
+----- Debug -----------
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
@@ -59,15 +62,6 @@ exportServiceProvider.exportPresetFields = {
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Go to Foto in WP Catalog'
-
-
------------- exportServiceProvider ----------------------------
-
-
-
-
-exportServiceProvider.canExportVideo = false 
-exportServiceProvider.supportsCustomSortOrder = true
 exportServiceProvider.disableRenamePublishedCollection = false -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
@@ -78,7 +72,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   o2L('processRenderedPhotos aufgerufen')
   
   --Debug.pauseIfAsked()
-  LrMobdebug.on()
+  --LrMobdebug.on()
   local LrExportSession = import 'LrExportSession' 
 	local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
@@ -115,7 +109,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   
 end
 
---[[
+
 -- Get all Media Files from WP-Media-Catalog via REST-API
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 function GetMedia( publishSettings, perpage, page ) 
@@ -275,7 +269,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
     end
  
-   --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
+   LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
    pscope:setPortionComplete(0.2)
 
   local foundph = {}
@@ -370,7 +364,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   
   addToWPColl(collection, searchDesc, foundph) 
   
-  --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
   pscope:setPortionComplete(0.8)
   LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
   
@@ -420,30 +414,32 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end -- if firtsync
 end -- function
 
--- image delete callback.
-function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
+-- image delete callback: Die callback Funktion selbst fehlt, ebenso POST
+-- Geht nicht : gibt eine Fehlermeldung, die nicht zum Absturz führt
+function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds )
+--function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
 -- REST-API mit Auth und Force zum Löschen
 -- Foto aus der Sammlung entfernen
 -- Metdaten aus dem Foto löschen
-  o2l('deletePhotosFromPublishedCollection call')
+  o2L('deletePhotosFromPublishedCollection call')
 	for i, photoId in ipairs( arrayOfPhotoIds ) do
 
-		Log( string.format( "Deleting id: %d", photoId ));
-		--local result = Post( "image/delete",  { pid = photoId }, publishSettings )
+    --Log( string.format( "Deleting id: %d", photoId ));
+    Log( "Deleting id: %d" .. photoId );
+		-- local result = Post( "image/delete",  { pid = photoId }, publishSettings )
 		
 		-- call the delete callback even if it fails on the Wordpress end
 		-- ToDo: Need to fix it so REST doesn't return an error if the delete fails
-		--			there's still a potential conflict here if the image is out of
-		--			kilter between the server and the local.
+		--			there's still a potential conflict here if the image is out of kilter between the server and the local.	
 		--if result ~= nil then
-			--deletedCallback( photoId )
+		deletedCallback( photoId ) -- Diese Callback-Funktion ist noch nicht definiert
 		--end
 
 	end
 end
 
- called when  collection (gallery) is added or renamed.
--- hier gibt es wahrsch. keine Funktion
+--called when  collection (gallery) is added or renamed.
+--[[ hier gibt es wahrsch. keine Funktion
 function exportServiceProvider.updateCollectionSettings( publishSettings, info )
   --LrMobdebug.on()
   o2L('updateCollectionSetSettings call')
@@ -482,9 +478,10 @@ function exportServiceProvider.updateCollectionSettings( publishSettings, info )
 	end
 
 end
+]]
 
 -- called when a publish collection set (album) is added or changed. (renamed)
--- hier gibt es wahrsch. keine Funktion
+--[[ hier gibt es wahrsch. keine Funktion
 function exportServiceProvider.updateCollectionSetSettings( publishSettings, info ) 
 	Log( "update Collection Set Settings, creating new album", info.publishedCollection )
 --LrMobdebug.on()
@@ -525,9 +522,10 @@ function exportServiceProvider.updateCollectionSetSettings( publishSettings, inf
 	
 	--end) -- lrTasks
 end 
+]]
 
 -- sort order als Variable im PHP in WP einstellen:
--- hier gibt es also wahrsch. keine Funktion)
+--[[hier gibt es also wahrsch. keine Funktion)
 function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
   o2L('imposeSortOrderOnPublishedCollection call')
 	-- ToDo: LR gives an empty id sequence if count of images is 2 or less. Maybe
@@ -538,22 +536,22 @@ function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSett
 	end
 	--local result = Post( "gallery/sort", { sequence = remoteIdSequence }, publishSettings )
 end
+]]
 
-
+--(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
 -- direkten Login in die Medien-Bibliothek öffnen
 function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
   o2L('goToPublishedPhoto call')
---(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
 end
 
+-- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   o2L('getCollectionBehaviorInfo call')
-  -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen
-	--outputToLog('getCollectionBehaviorInfo aufgerufen')
+  --outputToLog('getCollectionBehaviorInfo aufgerufen')
 	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
-		defaultCollectionCanBeDeleted = false,
+		defaultCollectionCanBeDeleted = true,
 		canAddCollection = true,
 		maxCollectionSetDepth = 0,
 	}
@@ -561,7 +559,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
 end
 
 function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
-	--outputToLog('metadataThatTriggersRepublish aufgerufen')
+	o2L('metadataThatTriggersRepublish aufgerufen')
 	return {
 
 		default = true,
@@ -581,5 +579,5 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 	}
 
 end
-]]
+
 return exportServiceProvider
