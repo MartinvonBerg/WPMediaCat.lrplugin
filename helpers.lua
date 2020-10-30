@@ -26,7 +26,7 @@ function replhyphen(filen)
 	return filen
 end
 
----------------------- iso8601ToTime(timeISO8601) ----------------------------------------------------------
+---------------------- shorted if expressions ----------------------------------------------------------
 function ifnil(str, subst)
 	return ((str == nil) and subst) or str
 end 
