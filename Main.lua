@@ -1,8 +1,8 @@
 --	Main entry point for plugin.
 ----- Debug -----------
-local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
-local Debug = require "Debug".init ()
-require "strict.lua"
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict.lua"
 
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
@@ -30,10 +30,10 @@ require 'Logger'
 ----- Debug -----------
 --local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
 --local Debug = require "Debug".init ()
---require "strict"
+require "strict"
 --require "strict.lua"
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 local inspect = require 'inspect'
 local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
@@ -86,27 +86,31 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local rend = exportContext.renditions
   local uploadedPhotoIds = {}
   local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2'
-  --Debug.pauseIfAsked()
+  
   
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
 
     local success, pathOrMessage = rendition:waitForRender()
     local photo = rendition.photo
-
-		
-
-			
-      if success then
-        local filename = LrPathUtils.leafName( pathOrMessage )
-        local ImageID = 'WPSync' .. tostring(1000+i)-- published before? 
-        --local ImageID = photo:getPropertyForPlugin( myPluginId, 'wpid' ) 
-        if ImageID then -- replace image
-						
-        else -- new image
-						ImageID  = 111 -- set to wpid
-        end
-        rendition:recordPublishedPhotoId( ImageID )
+    local ImageID
+    local wpid
+    			
+    if success then
+      --local filename = LrPathUtils.leafName( pathOrMessage )
+      --local ImageID = 'WPSync' .. tostring(1000+i)-- published before? 
+      wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
+      --Log(teststr)
+      if wpid == nil then wpid = 0 end
+      if tonumber(wpid) > 0 then -- replace image in or change state after first sync 
+          -- TODO: stimmt nur für first sync! replace image oder update geht nicht!
+          Log(wpid .. ' found')
+          ImageID  = 'WPSync' .. tostring(1000+i)-- published before?  -- set to wpid
+      else -- new image add to WP Media Catalog
+          ImageID  = 'WPSync' .. tostring(2000+i)-- published before?  -- set to wpid
+          Log('ID: ' .. ImageID)
       end
+      rendition:recordPublishedPhotoId( ImageID )
+    end
       
     
   end
@@ -132,16 +136,39 @@ function GetMedia( publishSettings, perpage, page )
 
 	if headers.status == 200 then
     	result = JSON:decode(result)
-  	else
+  else
     	result = nil
-  	end
+  end
   
   return result
- end
+end
+
+-- Delete Media Files from WP-Media-Catalog via REST-API
+function DeleteMedia( publishSettings, wpmediaid ) 
+	local hash = 'Basic ' .. publishSettings.hash
+	local httphead = {
+      {field='Authorization', value=hash},
+    }
+  local url = ''  
+  
+	url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
+  --http://127.0.0.1/wordpress/wp-json/wp/v2/media/3439?force=1
+  --http-methode: delete   
+	local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
+
+	if headers.status == 200 then
+      result = JSON:decode(result)
+      result = result['deleted']
+  else
+    	result = false
+  end
+  
+  return result
+end
 
 -- Serch pre-selected Images in LR Database, exclude Copies, marked by "Kopie.."
 -- special selection if more then on photo found. Selector: "Rot"
--- This runs as asynchronous Task! Main Task has to wait. No Signalling between Takks.
+-- This runs as asynchronous Task! Main Task has to wait. No Signalling between Tasks.
 -- add found photos to WP-LR-Sync-Collection
 function addToWPColl (collection, search, photos)
   
@@ -206,6 +233,7 @@ function addToWPColl (collection, search, photos)
   
 end
 
+-- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   --LrMobdebug.on()
   o2L('goToPublishedCollection aufgerufen')
@@ -216,7 +244,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local result
   local mediatable = {}
   local len = 0
-  local perpage = 100
+  local perpage = 10
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
@@ -266,7 +294,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        --break -- nur für Testzwecke: zum vozeitigen Abbruch : Debug
+        break -- nur für Testzwecke: zum vozeitigen Abbruch : Debug
       else
         getmore = false
       end
@@ -471,22 +499,23 @@ function exportServiceProvider.deletePhotosFromPublishedCollection( publishSetti
 end
 ]]
 
--- Delete photo from published collection
--- Quelle: https://github.com/willthames/photodeck.lrdevplugin : PhotoDeckPublishServiceProvider.lua (Zeilen 313-350)
+-- Delete photo from published collection, delete in WP-Media-Catalog, delete MetaData in LR Catalog
+-- Quelle: https://github.com/willthames/photodeck.lrdevplugin : PhotoDeckPublishServiceProvider.lua (Zeilen 313ff)
 exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId)
   o2L('publishServiceProvider.deletePhotosFromPublishedCollection')
-  LrMobdebug.on() 
+  --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
   local galleryId = collection:getRemoteId()
   local photoIdsToDelete = {}
   local photoIdsToUnpublish = {}
+  local LrPhotosToDelete = {}
   local result
   local error_msg
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
   local publishedPhotos = collection:getPublishedPhotos()
   local publishedPhotoById = {}
-  --Debug.pauseIfAsked()
+
   for _, pp in pairs(publishedPhotos) do
     publishedPhotoById[pp:getRemoteId()] = pp
   end
@@ -494,7 +523,8 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
     error_msg = nil
     if photoId ~= "" then
       local publishedPhoto = publishedPhotoById[photoId]
-
+      local catphoto = publishedPhoto:getPhoto()
+      table.insert(LrPhotosToDelete, catphoto)
       local collCount = 0
       for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
         if c:getRemoteId() ~= galleryId then
@@ -511,7 +541,40 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
       end
     end
   end
-  --Debug.pauseIfAsked()
+  
+  LrTasks.startAsyncTask(function ()
+   
+    local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2'
+
+    for i, photo in ipairs( LrPhotosToDelete ) do
+      --local aperture = '999'
+      --local photo2 = LrPhotosToDelete[i]
+      --local photo3 = photo:getPhoto()
+      --aperture = photo:getFormattedMetadata( 'aperture' )
+      local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
+      if wpid == nil then wpid = 0 end
+      local success = false
+      
+      if tonumber(wpid) > 0 then
+        success = DeleteMedia(publishSettings, wpid)
+      end
+
+      if success then
+        catalog:withWriteAccessDo( 'DeleteMetaData', function ()
+          photo:setPropertyForPlugin( _PLUGIN, 'wpid', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'upldate', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'wpwidth', '')
+          photo:setPropertyForPlugin( _PLUGIN,'wpheight', '')
+          photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', '')
+          photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'post', '')
+          photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+        end )
+        Log('WP-Media deleted: ' ..tostring(wpid).. '  ' .. tostring(success))
+      end
+    end
+  end )
+
   -- Unpublish
   local photoIdsToUnpublishCount = #photoIdsToUnpublish
   if photoIdsToUnpublishCount == 1 then
@@ -686,8 +749,8 @@ end
 function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 	o2L('metadataThatTriggersRepublish aufgerufen')
 	return {
-
-		default = true,
+    ['com.adobe.lightroom.export.wp_mediacat2.*'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    default = false,
 		title = true,
 		caption = true,
 		keywords = true,
@@ -695,12 +758,18 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 		dateCreated = false,
 		copyright = true,
 		headline = true,
-		instructions = true,
-		label = true,
-		provider = true,
-		rating = false,
-		source = true,
-		imagedate = true,
+		--instructions = true,
+		--label = true,
+		--provider = true,
+		--rating = false,
+		--source = true,
+    --imagedate = true,
+    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    --iptcSubjectCode = true,
+    --location = true,
+    --city = true,
+    --stateProvince = true,
+    --country = true,
 	}
 
 end

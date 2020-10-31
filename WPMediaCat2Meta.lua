@@ -1,4 +1,4 @@
---PMediaCat2Meta
+--Definition der Metadaten für das Plug-in. Bei Änderungen muss die schemaversion hochgezählt werden!
 return {
     schemaVersion = 4, -- increment this value any time you make a change to the field definitions below
    
