@@ -1,4 +1,8 @@
 --	Main entry point for plugin.
+----- Debug -----------
+local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+local Debug = require "Debug".init ()
+require "strict.lua"
 
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
@@ -28,8 +32,8 @@ require 'Logger'
 --local Debug = require "Debug".init ()
 --require "strict"
 --require "strict.lua"
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 local inspect = require 'inspect'
 local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
@@ -416,26 +420,147 @@ end -- function
 
 -- image delete callback: Die callback Funktion selbst fehlt, ebenso POST
 -- Geht nicht : gibt eine Fehlermeldung, die nicht zum Absturz führt
-function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds )
---function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
+--[[function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds )
+function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
 -- REST-API mit Auth und Force zum Löschen
 -- Foto aus der Sammlung entfernen
 -- Metdaten aus dem Foto löschen
   o2L('deletePhotosFromPublishedCollection call')
-	for i, photoId in ipairs( arrayOfPhotoIds ) do
+  --LrMobdebug.on()
+  LrTasks.startAsyncTask(function ()
+    LrMobdebug.on() 
+    --local collection = info.publishedCollection     
+    local catalog = LrApplication.activeCatalog()
+    --local nphotos = collection:getPhotos()
+    --local myPluginID = 'com.adobe.lightroom.export.wp_mediacat2'
+    
+    for i, photoId in ipairs( arrayOfPhotoIds ) do
+      local photo = catalog:findPhotos {
+         searchDesc = {
+           criteria = "all",
+           operation = "==",
+           value = photoId,
+          }      
+     }
+      local aperture = '999'
+      if ((photo ~=nil) and (#photo > 0)) then
+        aperture = photo:getFormattedMetadata( 'aperture' )
+      end
+      Log('Blende: ' .. aperture)
+    end
+    
+  end )
+      
+  for i, photoId in ipairs( arrayOfPhotoIds ) do
 
     --Log( string.format( "Deleting id: %d", photoId ));
     Log( "Deleting id: %d" .. photoId );
-		-- local result = Post( "image/delete",  { pid = photoId }, publishSettings )
-		
-		-- call the delete callback even if it fails on the Wordpress end
-		-- ToDo: Need to fix it so REST doesn't return an error if the delete fails
-		--			there's still a potential conflict here if the image is out of kilter between the server and the local.	
-		--if result ~= nil then
-		deletedCallback( photoId ) -- Diese Callback-Funktion ist noch nicht definiert
-		--end
+    -- local result = Post( "image/delete",  { pid = photoId }, publishSettings )
+    --local ImageID = photoId:getPropertyForPlugin( _PLUGIN, 'wpid' )
+    --local aperture = photoId:getFormattedMetadata( 'aperture' )
+    --local aperture = '99'      
+    --Log('Blende: ' .. aperture)
+    -- call the delete callback even if it fails on the Wordpress end
+    -- ToDo: Need to fix it so REST doesn't return an error if the delete fails
+    --			there's still a potential conflict here if the image is out of kilter between the server and the local.	
+    --if result ~= nil then
+    deletedCallback( photoId ) -- Diese Callback-Funktion ist noch nicht definiert
+    --end
 
-	end
+  end
+end
+]]
+
+-- Delete photo from published collection
+-- Quelle: https://github.com/willthames/photodeck.lrdevplugin : PhotoDeckPublishServiceProvider.lua (Zeilen 313-350)
+exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId)
+  o2L('publishServiceProvider.deletePhotosFromPublishedCollection')
+  LrMobdebug.on() 
+  local catalog = LrApplication.activeCatalog()
+  local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
+  local galleryId = collection:getRemoteId()
+  local photoIdsToDelete = {}
+  local photoIdsToUnpublish = {}
+  local result
+  local error_msg
+  -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
+  local publishedPhotos = collection:getPublishedPhotos()
+  local publishedPhotoById = {}
+  --Debug.pauseIfAsked()
+  for _, pp in pairs(publishedPhotos) do
+    publishedPhotoById[pp:getRemoteId()] = pp
+  end
+  for i, photoId in ipairs( arrayOfPhotoIds ) do
+    error_msg = nil
+    if photoId ~= "" then
+      local publishedPhoto = publishedPhotoById[photoId]
+
+      local collCount = 0
+      for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
+        if c:getRemoteId() ~= galleryId then
+          collCount = collCount + 1
+        end
+      end
+
+      if collCount == 0 then
+        -- delete photo if this is the only collection it's in
+        table.insert(photoIdsToDelete, photoId)
+      else
+        -- otherwise unpublish from the passed in collection
+        table.insert(photoIdsToUnpublish, photoId)
+      end
+    end
+  end
+  --Debug.pauseIfAsked()
+  -- Unpublish
+  local photoIdsToUnpublishCount = #photoIdsToUnpublish
+  if photoIdsToUnpublishCount == 1 then
+    -- Only one photo needs to be unpublished. Use non batched API endpoint.
+    local photoId = photoIdsToUnpublish[1]
+    --result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
+    else
+      deletedCallback(photoId)
+    end
+  elseif photoIdsToUnpublishCount > 0 then
+    -- More than one photo needs to be unpublished. Use batched API endpoint.
+    --result, error_msg = PhotoDeckAPI.unpublishPhotos(photoIdsToUnpublish, galleryId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhotos=Error unpublishing photos: ^1", error_msg))
+    else
+      for _, photoId in ipairs(photoIdsToUnpublish) do
+        deletedCallback(photoId)
+      end
+    end
+  end
+
+  -- Delete
+  local photoIdsToDeleteCount = #photoIdsToDelete
+  if photoIdsToDeleteCount == 1 then
+    -- Only one photo needs to be deleted. Use non batched API endpoint.
+    local photoId = photoIdsToDelete[1]
+    --result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
+    else
+      deletedCallback(photoId)
+    end
+  elseif photoIdsToDeleteCount > 0 then
+    -- More than one photo needs to be deleted. Use batched API endpoint.
+    --result, error_msg = PhotoDeckAPI.deletePhotos(photoIdsToDelete)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhotos=Error deleting photos: ^1", error_msg))
+    else
+      for _, photoId in ipairs(photoIdsToDelete) do
+        deletedCallback(photoId)
+      end
+    end
+  end
 end
 
 --called when  collection (gallery) is added or renamed.

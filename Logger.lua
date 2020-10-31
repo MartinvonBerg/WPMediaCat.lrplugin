@@ -1,3 +1,8 @@
+----- Debug -----------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict.lua"
+
 local LrLogger = import "LrLogger"
 
 local Logger = LrLogger( "WP_MediaCat2" ) 

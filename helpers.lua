@@ -1,3 +1,8 @@
+----- Debug -----------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict.lua"
+
 local LrDate = import( 'LrDate' )
 
 ------------ helper functions --------------------------------------------

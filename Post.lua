@@ -6,9 +6,9 @@ by Martin von Berg
 
 ------------- Debug ----------------------
 
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--ocal Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
 --local Debug = require "Debug".init ()
-require 'strict'
+--require 'strict.lua'
 local inspect = require 'inspect'
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 --LrMobdebug.start()

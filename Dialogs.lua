@@ -4,6 +4,10 @@
 	by Martin von Berg
 	TODO: Hash-value gemäß gewähltem Auth-Verfahren (OAuth, OAuth2) aus User-ID und Password berechnen!
 ]]
+----- Debug -----------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict.lua"
 
 local LrView = import 'LrView'
 local LrDialogs = import 'LrDialogs'

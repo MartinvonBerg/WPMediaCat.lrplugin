@@ -1,3 +1,8 @@
+----- Debug -----------
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Debug = require "Debug".init ()
+--require "strict.lua"
+
 -- -*- coding: utf-8 -*-
 --
 -- Simple JSON encoding and decoding in pure Lua.
