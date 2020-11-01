@@ -32,8 +32,8 @@ require 'Logger'
 --local Debug = require "Debug".init ()
 require "strict"
 --require "strict.lua"
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 local inspect = require 'inspect'
 local myLogger = LrLogger( 'WPSynclog' )
 myLogger:enable( "logfile" )
@@ -76,17 +76,17 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   o2L('processRenderedPhotos aufgerufen')
   
   --Debug.pauseIfAsked()
-  --LrMobdebug.on()
+  LrMobdebug.on()
   local LrExportSession = import 'LrExportSession' 
 	local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
-	local nPhotos = exportSession:countRenditions()
-  local exportParams = exportSettings
-	local publishedCollectionInfo = exportContext.publishedCollectionInfo
-  local rend = exportContext.renditions
-  local uploadedPhotoIds = {}
-  local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2'
-  
+	--local nPhotos = exportSession:countRenditions()
+  --local exportParams = exportSettings
+	--local publishedCollectionInfo = exportContext.publishedCollectionInfo
+  --local rend = exportContext.renditions
+  --local uploadedPhotoIds = {}
+  local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
+  local pseudoPublishSettings = exportSettings['< contents >']
   
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
 
@@ -104,19 +104,50 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       if tonumber(wpid) > 0 then -- replace image in or change state after first sync 
           -- TODO: stimmt nur für first sync! replace image oder update geht nicht!
           Log(wpid .. ' found')
-          ImageID  = 'WPSync' .. tostring(1000+i)-- published before?  -- set to wpid
+          ImageID  = 'WPSync' .. tostring(1000+i) -- published before?  -- set to wpid
       else -- new image add to WP Media Catalog
-          ImageID  = 'WPSync' .. tostring(2000+i)-- published before?  -- set to wpid
-          Log('ID: ' .. ImageID)
+          ImageID  = 'WPSync' .. tostring(2000+i) -- published before?  -- set to wpid
+          local filename = photo:getFormattedMetadata( 'fileName' ) --leafname liefert auch den Dateinamen
+          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage )
+          local result = renditionfilename
+          Log('Upload: ' .. result)
+          result = AddNewMedia(pseudoPublishSettings, filename)
+          
       end
       rendition:recordPublishedPhotoId( ImageID )
     end
-      
+    
+    -- delete temp file. There is a cleanup step that happens later, but this will help manage space in the event of a large upload.
+		LrFileUtils.delete( pathOrMessage )
     
   end
   
 end
 
+-- Add Media File to WP-Media-Catalog via REST-API
+function AddNewMedia( publishSettings, filename ) 
+  local hash = 'Basic ' .. publishSettings['hash']
+  local filen = filename
+  local wpid = 0
+	local httphead = {
+      {field='Authorization', value=hash},
+      {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
+      {field='Content-Type', value='image/jpeg'},
+    }
+
+  local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
+    
+	local result, headers = LrHttp.post( url, '', httphead )
+
+	if headers.status == 201 then
+      result = JSON:decode(result)
+      wpid = result['id']
+  else
+    	wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+  end
+  
+  return wpid
+end
 
 -- Get all Media Files from WP-Media-Catalog via REST-API
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
@@ -165,6 +196,8 @@ function DeleteMedia( publishSettings, wpmediaid )
   
   return result
 end
+
+
 
 -- Serch pre-selected Images in LR Database, exclude Copies, marked by "Kopie.."
 -- special selection if more then on photo found. Selector: "Rot"
