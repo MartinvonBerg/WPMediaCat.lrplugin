@@ -73,7 +73,7 @@ exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den 
 -- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. Bug : rendition is empty
 -- aber nPhotos is korrekt
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
-  o2L('processRenderedPhotos aufgerufen')
+  Log('processRenderedPhotos aufgerufen')
   
   --Debug.pauseIfAsked()
   LrMobdebug.on()
@@ -87,7 +87,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   --local uploadedPhotoIds = {}
   local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
   local pseudoPublishSettings = exportSettings['< contents >']
-  
+  -- TODO: ProcessScope fehlt noch!
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
 
     local success, pathOrMessage = rendition:waitForRender()
@@ -106,13 +106,16 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           Log(wpid .. ' found')
           ImageID  = 'WPSync' .. tostring(1000+i) -- published before?  -- set to wpid
       else -- new image add to WP Media Catalog
-          ImageID  = 'WPSync' .. tostring(2000+i) -- published before?  -- set to wpid
-          local filename = photo:getFormattedMetadata( 'fileName' ) --leafname liefert auch den Dateinamen
+          local filename = photo:getFormattedMetadata( 'fileName' ) --leafname liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage )
-          local result = renditionfilename
+          local result = 'none'
+          result = AddNewMedia(pseudoPublishSettings, filename, renditionFilePath)
+          if type(result) == 'number' then
+            ImageID  = 'WPSync' .. tostring(result) -- published before?  -- set to wpid --diese Nummer muss eineindeutig sein!
+          else
+            ImageID = ''
+          end
           Log('Upload: ' .. result)
-          result = AddNewMedia(pseudoPublishSettings, filename)
-          
       end
       rendition:recordPublishedPhotoId( ImageID )
     end
@@ -125,7 +128,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 end
 
 -- Add Media File to WP-Media-Catalog via REST-API
-function AddNewMedia( publishSettings, filename ) 
+function AddNewMedia( publishSettings, filename, path ) 
   local hash = 'Basic ' .. publishSettings['hash']
   local filen = filename
   local wpid = 0
@@ -134,14 +137,15 @@ function AddNewMedia( publishSettings, filename )
       {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
       {field='Content-Type', value='image/jpeg'},
     }
-
+  local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+    
   local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
     
-	local result, headers = LrHttp.post( url, '', httphead )
+	local result, headers = LrHttp.post( url, imgfile, httphead )
 
 	if headers.status == 201 then
       result = JSON:decode(result)
-      wpid = result['id']
+      wpid = tonumber(result['id'])
   else
     	wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
   end
