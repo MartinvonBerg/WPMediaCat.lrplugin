@@ -15,6 +15,7 @@ local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
+local LrExportSession = import 'LrExportSession'
 --local LrErrors = import 'LrErrors'
 --local LrFtp = import 'LrFtp'
 --local LrXml = import 'LrXml'
@@ -70,61 +71,232 @@ exportServiceProvider.disableRenamePublishedCollection = false -- benennt die Sa
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
 
+function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
+	o2L('metadataThatTriggersRepublish aufgerufen')
+	return {
+    -- TODO: Nach dem Neustart sind alle Bilder in republish
+    --['com.adobe.lightroom.export.wp_mediacat2.*'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    default = false,
+		title = true,
+		caption = true,
+		keywords = true,
+		gps = true,
+		dateCreated = false,
+		copyright = true,
+		headline = true,
+		--instructions = true,
+		label = false,
+		--provider = true,
+		rating = false, 
+		--source = true,
+    --imagedate = true,
+    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    --iptcSubjectCode = true,
+    --location = true,
+    --city = true,
+    --stateProvince = true,
+    --country = true,
+	}
+
+end
+
 -- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. Bug : rendition is empty
 -- aber nPhotos is korrekt
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
-  
   --Debug.pauseIfAsked()
   LrMobdebug.on()
-  local LrExportSession = import 'LrExportSession' 
+
+  --local LrExportSession = import 'LrExportSession' 
 	local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
-	--local nPhotos = exportSession:countRenditions()
-  --local exportParams = exportSettings
-	--local publishedCollectionInfo = exportContext.publishedCollectionInfo
-  --local rend = exportContext.renditions
-  --local uploadedPhotoIds = {}
+  local catalog = LrApplication.activeCatalog()
+	local nPhotos = exportSession:countRenditions()
   local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
   local pseudoPublishSettings = exportSettings['< contents >']
-  -- TODO: ProcessScope fehlt noch!
-  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
+  
+   local progressScope = exportContext:configureProgress {
+    title = nPhotos > 1
+    and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
+    or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck",
+  }
 
+  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
+    
     local success, pathOrMessage = rendition:waitForRender()
     local photo = rendition.photo
     local ImageID
     local wpid
-    			
+    local data
+    
     if success then
-      --local filename = LrPathUtils.leafName( pathOrMessage )
-      --local ImageID = 'WPSync' .. tostring(1000+i)-- published before? 
+      
+      progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
       wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
-      --Log(teststr)
-      if wpid == nil then wpid = 0 end
+      
+      if wpid == nil or wpid == '' then wpid = 0 end
+     
       if tonumber(wpid) > 0 then -- replace image in or change state after first sync 
           -- TODO: stimmt nur für first sync! replace image oder update geht nicht!
           Log(wpid .. ' found')
           ImageID  = 'WPSync' .. tostring(1000+i) -- published before?  -- set to wpid
-      else -- new image add to WP Media Catalog
-          local filename = photo:getFormattedMetadata( 'fileName' ) --leafname liefert auch den Dateinamen, hier aber filename für WP-Mediacat
-          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage )
+          -- replace nur Metadaten
+          -- nur Änderung von Titel, Bildunterschrift, und Gallery, wenn's mal geht über REST in description, caption, alt_text, title
+          -- alle anderen Daten, Bild, GPS : Bild komplett ersetzen, dafür ist WP-Funktion erforderlich!
+          -- Wie zwischen den beiden Fällen unterscheiden?
+      
+      else -- add new image to WP Media Catalog
+          local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
+          Log('Datei: ' .. filename)
+          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
+          Log('Rendition-Datei: ' .. renditionFilePath)
           local result = 'none'
-          result = AddNewMedia(pseudoPublishSettings, filename, renditionFilePath)
+          result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath )
+          
           if type(result) == 'number' then
-            ImageID  = 'WPSync' .. tostring(result) -- published before?  -- set to wpid --diese Nummer muss eineindeutig sein!
+            ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
+            -- fehlende LR-Metadaten in den WP Katalog schreiben
+            local LrMeta = {
+              caption = photo:getFormattedMetadata('caption'),
+              gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ),
+            } 
+            WriteLrMetaToWp( pseudoPublishSettings, result, LrMeta )
+            -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
+            catalog:withWriteAccessDo( 'AddMetaData', function ()
+              WriteCustomMetaData( photo, data )
+            end )
+
           else
             ImageID = ''
           end
+
           Log('Upload: ' .. result)
       end
       rendition:recordPublishedPhotoId( ImageID )
     end
-    
     -- delete temp file. There is a cleanup step that happens later, but this will help manage space in the event of a large upload.
 		LrFileUtils.delete( pathOrMessage )
     
   end
+
+  progressScope:done()
+
+end
+
+function WriteLrMetaToWp( publishSettings, wpid, LrMeta )
+  -- Write LR Metadata of photo to WP Mediacat via REST-API
+  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
+  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
+  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
   
+  -- LR caption kommt in den alt-tag und in die Beschreibung (description.raw geschrieben werden
+  -- alt-tag leerlassen, wenn das Bild als dekoratives Element dient
+  
+  local success = false
+  local n = 0
+  local hash = 'Basic ' .. publishSettings['hash']
+  local httphead = {
+      {field='Authorization', value=hash},
+  }
+  local result
+  local headers
+
+  local function pre(n)
+    -- suffix für url bestimmen je nach anzahl metadaten '?' oder '&'
+    local str = ''
+    if n == 0 then
+      str = '?'
+    else
+      str = '&'
+    end
+    return str
+  end
+  
+  local char_to_hex = function(c)
+    return string.format("%%%02X", string.byte(c))
+  end
+  
+  local function urlencode(url)
+    if url == nil then
+      return
+    end
+    url = url:gsub("\n", "\r\n")
+    url = url:gsub("([^%w ])", char_to_hex)
+    url = url:gsub(" ", "+")
+    return url
+  end
+
+  local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+  
+  for k, v in pairs(LrMeta) do
+    if k == 'caption' and v ~= '' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+      local str = 'alt_text=' .. v .. '&description=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
+      url = url .. pre(n) .. str
+      n = n + 1
+    end
+    if k == 'gallery' and v ~= '' then
+      -- TODO: do nothing until field is available via REST-API
+      --local gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ) -- TODO: Dieser Wert ist in Rest noch nicht verfügbar
+      n = n + 1
+    end
+  end
+
+  if n>0 then
+    result, headers = LrHttp.post( url, '', httphead )
+    if headers.status == 200 then
+      success = true
+      Log('Wrote Meta to Rest: ' .. url)
+    end
+  end
+
+end
+
+function ExtractDataFromREST( restdata )
+  -- aus einer REST-Antwort zu einer Datei die Daten für customMetadata extrahieren
+  local i = 1
+  local result = {} -- ???
+  result[i] = restdata
+  local row = {}
+  local keyfound = false
+  local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
+  local ii,j = string.find(str,'full') -- den vollen Filename suchen
+  local lrid
+  
+  if ii ~= nil then
+    keyfound = true  -- Der filename ist in der Rest-Antwort enthalten
+	end
+		
+  if keyfound then
+    row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+  else
+    local fname = result[i].media_details.file
+    fname = getfile(fname)
+    row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = fname} 
+  end
+  return row
+end
+
+function WriteCustomMetaData( photo, restmetadata )
+  -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
+  -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
+  local i = 1
+  local foundph = {}
+  foundph[i] =  restmetadata
+
+  local date = tostring(foundph[i].upldate)
+  date = iso8601ToTime(date)
+  local dateday = LrDate.formatShortDate(date)
+  local datetime = LrDate.formatMediumTime( date )
+
+  photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
+  photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
+  photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
+  photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
+  photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+  photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
+  photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
+  photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
 end
 
 -- Add Media File to WP-Media-Catalog via REST-API
@@ -132,6 +304,7 @@ function AddNewMedia( publishSettings, filename, path )
   local hash = 'Basic ' .. publishSettings['hash']
   local filen = filename
   local wpid = 0
+  local restData = {}
 	local httphead = {
       {field='Authorization', value=hash},
       {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
@@ -146,11 +319,12 @@ function AddNewMedia( publishSettings, filename, path )
 	if headers.status == 201 then
       result = JSON:decode(result)
       wpid = tonumber(result['id'])
+      restData = ExtractDataFromREST(result)
   else
     	wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
   end
   
-  return wpid
+  return wpid, restData
 end
 
 -- Get all Media Files from WP-Media-Catalog via REST-API
@@ -200,8 +374,6 @@ function DeleteMedia( publishSettings, wpmediaid )
   
   return result
 end
-
-
 
 -- Serch pre-selected Images in LR Database, exclude Copies, marked by "Kopie.."
 -- special selection if more then on photo found. Selector: "Rot"
@@ -277,7 +449,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos()
-  local firstsync = 'false'
+  local firstsync = false
   local result
   local mediatable = {}
   local len = 0
@@ -309,10 +481,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       do
         local row = {}
         local keyfound = false
-        local str = inspect(result[i])
-        local ii,j = string.find(str,'full')
+        local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str imwandeln
+        local ii,j = string.find(str,'full') -- den vollen Filename suchen
         if ii ~= nil then
-          keyfound = true  
+          keyfound = true  -- Der filename ist im Rest enthalten
 		end
 		
         if keyfound then
@@ -476,6 +648,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
 
   -- TODO: Download der nicht gefundenen bilder zum Katalog
+  -- TODO: am Ende process rendered photos mit contect aufrufen, um die ImageID in der rendition zu setzen.
   -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
   -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
   -- Metadaten wie auch bei den gefundenen Fotos setzen
@@ -781,34 +954,6 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
 		maxCollectionSetDepth = 0,
 	}
 	
-end
-
-function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
-	o2L('metadataThatTriggersRepublish aufgerufen')
-	return {
-    ['com.adobe.lightroom.export.wp_mediacat2.*'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    default = false,
-		title = true,
-		caption = true,
-		keywords = true,
-		gps = true,
-		dateCreated = false,
-		copyright = true,
-		headline = true,
-		--instructions = true,
-		--label = true,
-		--provider = true,
-		--rating = false,
-		--source = true,
-    --imagedate = true,
-    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    --iptcSubjectCode = true,
-    --location = true,
-    --city = true,
-    --stateProvince = true,
-    --country = true,
-	}
-
 end
 
 return exportServiceProvider
