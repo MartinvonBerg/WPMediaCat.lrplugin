@@ -72,7 +72,7 @@ exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den 
 ------------ exportServiceProvider ----------------------------
 
 function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
-	o2L('metadataThatTriggersRepublish aufgerufen')
+	Log('metadataThatTriggersRepublish aufgerufen')
 	return {
     -- TODO: Nach dem Neustart sind alle Bilder in republish
     --['com.adobe.lightroom.export.wp_mediacat2.*'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
@@ -81,22 +81,12 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 		caption = true,
 		keywords = true,
 		gps = true,
-		dateCreated = false,
+		--dateCreated = false,
 		copyright = true,
-		headline = true,
-		--instructions = true,
-		label = false,
-		--provider = true,
-		rating = false, 
-		--source = true,
-    --imagedate = true,
-    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    --iptcSubjectCode = true,
-    --location = true,
-    --city = true,
-    --stateProvince = true,
-    --country = true,
-	}
+		--label = false,
+		--rating = false, 
+	  --customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+  }
 
 end
 
@@ -130,20 +120,42 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     local data
     
     if success then
-      
       progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
-      wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
       
+      wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
       if wpid == nil or wpid == '' then wpid = 0 end
+      
+      local photoMeta = {
+        caption = photo:getFormattedMetadata('caption'),
+        title = photo:getFormattedMetadata( 'title' ),
+        gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ),
+      }
      
-      if tonumber(wpid) > 0 then -- replace image in or change state after first sync 
+      if tonumber(wpid) > 0 then -- replace image or change state to published after first sync 
           -- TODO: stimmt nur für first sync! replace image oder update geht nicht!
-          Log(wpid .. ' found')
-          ImageID  = 'WPSync' .. tostring(1000+i) -- published before?  -- set to wpid
-          -- replace nur Metadaten
+          Log(wpid .. ' found. Now updating')
+          -- Abfrage: replace nur Metadaten oder das komplette Bild?
           -- nur Änderung von Titel, Bildunterschrift, und Gallery, wenn's mal geht über REST in description, caption, alt_text, title
-          -- alle anderen Daten, Bild, GPS : Bild komplett ersetzen, dafür ist WP-Funktion erforderlich!
+          -- alle anderen Daten, Bild, GPS : Bild komplett ersetzen, dafür ist eine WP-Funktion erforderlich!
           -- Wie zwischen den beiden Fällen unterscheiden?
+          
+          data = GetMedia(pseudoPublishSettings, wpid) 
+          data = ExtractDataFromREST(data)
+
+          -- Prüfung auf Identität, wenn hier Änderung, dann auch in WritephotoMetaToWp
+          if data['title'] == photoMeta['title'] and  (data['caption'] == photoMeta['title']) then photoMeta['title'] = '' end -- title und caption = title
+          if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
+            photoMeta['caption'] = '' 
+          end
+          if data['gallery'] == photoMeta['gallery'] then photoMeta['gallery'] = '' end
+         
+          local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
+          if success then
+            Log(wpid .. ' found. Was updated')
+            ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
+          else
+            ImageID = ''
+          end
       
       else -- add new image to WP Media Catalog
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
@@ -156,11 +168,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           if type(result) == 'number' then
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
             -- fehlende LR-Metadaten in den WP Katalog schreiben
-            local LrMeta = {
-              caption = photo:getFormattedMetadata('caption'),
-              gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ),
-            } 
-            WriteLrMetaToWp( pseudoPublishSettings, result, LrMeta )
+            
+            WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( photo, data )
@@ -183,16 +192,25 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
 end
 
-function WriteLrMetaToWp( publishSettings, wpid, LrMeta )
+function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
   -- Write LR Metadata of photo to WP Mediacat via REST-API
-  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
-  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
-  -- POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
-  
-  -- LR caption kommt in den alt-tag und in die Beschreibung (description.raw geschrieben werden
-  -- alt-tag leerlassen, wenn das Bild als dekoratives Element dient
-  
+  -- Parameters: wpid: Number evtl. auch String, aber dann zu Number wandelbar
+  -- photoMeta: Tabelle mit Metadaten als key-value-pair
+  -- publishSettings: Tabelle ähnlich den Lr-Lua-PublishSettings, hier aber kopiert, da Original nicht bereitsteht
+  -- LR caption kommt in den alt-tag und in die Beschreibung bzw. description.raw 
+  -- alt-tag leerlassen, wenn das Bild als dekoratives Element dient!
+
+  -- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
+  -- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
+  -- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
+    
   local success = false
+
+  if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
+    Log('WritephotoMetaToWp failed')
+    return success
+  end
+
   local n = 0
   local hash = 'Basic ' .. publishSettings['hash']
   local httphead = {
@@ -228,16 +246,22 @@ function WriteLrMetaToWp( publishSettings, wpid, LrMeta )
 
   local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
   
-  for k, v in pairs(LrMeta) do
-    if k == 'caption' and v ~= '' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+  for k, v in pairs(photoMeta) do
+    if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
       v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
       local str = 'alt_text=' .. v .. '&description=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
       url = url .. pre(n) .. str
       n = n + 1
     end
-    if k == 'gallery' and v ~= '' then
+    if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
       -- TODO: do nothing until field is available via REST-API
       --local gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ) -- TODO: Dieser Wert ist in Rest noch nicht verfügbar
+      n = n + 1
+    end
+    if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+      local str = 'title=' .. v .. '&caption=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
+      url = url .. pre(n) .. str
       n = n + 1
     end
   end
@@ -248,32 +272,90 @@ function WriteLrMetaToWp( publishSettings, wpid, LrMeta )
       success = true
       Log('Wrote Meta to Rest: ' .. url)
     end
+  else
+    success = true
+    Log('No Meta to update: ' .. url)
   end
+
+  return success
 
 end
 
 function ExtractDataFromREST( restdata )
   -- aus einer REST-Antwort zu einer Datei die Daten für customMetadata extrahieren
+  -- Parameter restdata: JSON-Format der REST-Antwort
   local i = 1
-  local result = {} -- ???
+  local result = {} 
   result[i] = restdata
   local row = {}
   local keyfound = false
+  local lrid
+  local w1, w2
+
   local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
   local ii,j = string.find(str,'full') -- den vollen Filename suchen
-  local lrid
-  
   if ii ~= nil then
     keyfound = true  -- Der filename ist in der Rest-Antwort enthalten
-	end
-		
+  end
+  
+  local _descr = result[i].description.rendered  
+  w1, w2 = string.find(_descr, '<p>.*</p>')
+  if w1 ~=nil and w2 ~= nil then
+    _descr = string.sub(_descr,w1+3,w2-4)
+    w1 = nil
+    w2 = nil
+  else
+    _descr = ''
+  end
+
+  local _caption = result[i].caption.rendered
+  w1, w2 = string.find(_caption, '<p>.*</p>')
+  if w1 ~=nil and w2 ~= nil then
+    _caption = string.sub(_caption,w1+3,w2-4)
+    w1 = nil
+    w2 = nil
+  else
+    _caption = ''
+  end
+
   if keyfound then
-    row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
+    row = {lrid = {}, id = result[i].id, 
+                      upldate = result[i].date, 
+                      width = result[i].media_details.width, 
+                      height = result[i].media_details.height, 
+                      slug = result[i].slug, 
+                      post = result[i].post, 
+                      gallery = result[i].gallery, 
+                      phurl = result[i].source_url, 
+                      filen = result[i].media_details.sizes.full.file,
+                      datemod = result[i].modified, 
+                      title = result[i].title.rendered,
+                      descr = _descr,  
+                      caption = _caption,
+                      alt  = result[i].alt_text, 
+                      origfile = result[i].media_details.original_image,  -- Fehler, wenn nicht vorhanden?
+          } 
   else
     local fname = result[i].media_details.file
     fname = getfile(fname)
-    row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = fname} 
+    row = {lrid = {}, id = result[i].id, 
+                      upldate = result[i].date, 
+                      width = result[i].media_details.width, 
+                      height = result[i].media_details.height, 
+                      slug = result[i].slug, 
+                      post = result[i].post, 
+                      gallery = result[i].gallery, 
+                      phurl = result[i].source_url, 
+                      filen = fname,
+                      datemod = result[i].modified, 
+                      title = result[i].title.rendered,
+                      descr = _descr,  
+                      caption = _caption,
+                      alt  = result[i].alt_text, 
+                      origfile = result[i].media_details.original_image, -- Fehler, wenn nicht vorhanden?
+                    } 
   end
+
   return row
 end
 
@@ -305,11 +387,17 @@ function AddNewMedia( publishSettings, filename, path )
   local filen = filename
   local wpid = 0
   local restData = {}
+
+  if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
+    return
+  end
+
 	local httphead = {
       {field='Authorization', value=hash},
       {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
       {field='Content-Type', value='image/jpeg'},
     }
+
   local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
     
   local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
@@ -330,30 +418,45 @@ end
 -- Get all Media Files from WP-Media-Catalog via REST-API
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 function GetMedia( publishSettings, perpage, page ) 
-	local hash = 'Basic ' .. publishSettings.hash
+  local result = nil
+  if publishSettings == {} or publishSettings == nil then
+    return result
+  end
+
+  local _hash = publishSettings.hash or publishSettings['hash']
+  local _siteURL = publishSettings.siteURL or publishSettings['siteURL'] 
+
+  local hash = 'Basic ' .. _hash
+  local url = '' 
 	local httphead = {
       {field='Authorization', value=hash},
     }
-	local url = ''  
-	if perpage ~=nil then
-		url = publishSettings.siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
-	else
-		url = publishSettings.siteURL .. "/wp-json/wp/v2/media/"
+   
+  if tonumber(perpage) ~=nil and tonumber(page) ~=nil then
+		url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
+  elseif tonumber(perpage) > 0 and tonumber(page) ==nil then
+    url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
+  else  
+		url = _siteURL .. "/wp-json/wp/v2/media/"
 	end
    
 	local result, headers = LrHttp.get( url, httphead )
 
 	if headers.status == 200 then
     	result = JSON:decode(result)
-  else
-    	result = nil
-  end
+   end
   
   return result
 end
 
 -- Delete Media Files from WP-Media-Catalog via REST-API
 function DeleteMedia( publishSettings, wpmediaid ) 
+  local result = false
+  local idcheck = type(tonumber(wpmediaid))
+  if publishSettings == {} or publishSettings.hash == '' or publishSettings.siteURL == '' or idcheck ~= 'number' then
+    return result
+  end
+
 	local hash = 'Basic ' .. publishSettings.hash
 	local httphead = {
       {field='Authorization', value=hash},
@@ -368,8 +471,6 @@ function DeleteMedia( publishSettings, wpmediaid )
 	if headers.status == 200 then
       result = JSON:decode(result)
       result = result['deleted']
-  else
-    	result = false
   end
   
   return result
@@ -754,7 +855,7 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   
   LrTasks.startAsyncTask(function ()
    
-    local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2'
+    local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch Variable ersetzen
 
     for i, photo in ipairs( LrPhotosToDelete ) do
       --local aperture = '999'
