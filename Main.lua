@@ -29,7 +29,7 @@ local inspect = require 'inspect'
 exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo', 'fileNaming', 'video' } -- exportLocation erzeugt den Reiter "Speicherort für Export"
+exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo', 'fileNaming', 'video' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
 exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
@@ -146,7 +146,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             local success = WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
-              WriteCustomMetaData( photo, data )
+              WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
 
           else
@@ -333,7 +333,7 @@ function ExtractDataFromREST( restdata )
   return row
 end
 
-function WriteCustomMetaData( photo, restmetadata )
+function WriteCustomMetaData( publishSettings, photo, restmetadata )
   -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
   -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
   local i = 1
@@ -344,6 +344,7 @@ function WriteCustomMetaData( photo, restmetadata )
   date = iso8601ToTime(date)
   local dateday = LrDate.formatShortDate(date)
   local datetime = LrDate.formatMediumTime( date )
+  --local url = publishSettings['siteURL']
 
   photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
   photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
@@ -353,6 +354,14 @@ function WriteCustomMetaData( photo, restmetadata )
   photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
   photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
   photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
+
+  -- set to: http://127.0.0.1/wordpress/wp-content/uploads/2020/11/Wanderung-Achquacheta-38-scaled.jpg
+  --                    https://www.mvb1.de/smrtzl/uploads/2020/10/Bike-Hike-Lago-Lansfero-282.jpg
+  --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+  -- set to: http://127.0.0.1/wordpress/wp-admin/post.php?post=4522&action=edit
+  --                https://www.mvb1.de/wp-admin/post.php?post=4884&action=edit
+  --url = url .. '/wp-admin/post.php?post=' .. tostring(foundph[i].id) .. '&action=edit'
+  --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
 end
 
 -- Add Media File to WP-Media-Catalog via REST-API
@@ -858,7 +867,6 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
     end
   end
 end
-
 
 --(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
 -- TODO: direkten Login in die Medien-Bibliothek öffnen
