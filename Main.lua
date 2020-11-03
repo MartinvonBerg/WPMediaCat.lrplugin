@@ -100,7 +100,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       
       -- Metadaten aus dem LR Katalog auslesen
       wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
-      if wpid == nil or wpid == '' then wpid = 0 end
+      if wpid == nil or wpid == '' or wpid == 'nil' then wpid = 0 end
       local photoMeta = {
         caption = photo:getFormattedMetadata('caption'),
         title = photo:getFormattedMetadata( 'title' ),
@@ -346,7 +346,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   date = iso8601ToTime(date)
   local dateday = LrDate.formatShortDate(date)
   local datetime = LrDate.formatMediumTime( date )
-  local url = publishSettings['siteURL']
+  local url = publishSettings['siteURL'] or publishSettings.siteURL
   
   photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
   photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
@@ -531,7 +531,7 @@ end
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   --LrMobdebug.on()
-  Log('goToPublishedCollection aufgerufen')
+  Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos()
@@ -549,7 +549,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   })
   
   if #nphotos == 0 then
-    firstsync = true 
+    firstsync = true -- Zugriff in processRenderedPhotos nur mit exportContext.propertyTable.firstsync
     publishSettings.firstsync = true
   end
    
@@ -596,9 +596,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
     end
  
-   LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to collection now.", #mediatable),'','info')
-   pscope:setPortionComplete(0.2)
+  LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
+  pscope:setPortionComplete(0.2)
 
+  -- Suche die Fotos im LR-Catalog
   local foundph = {}
   local notfound = {}
   local nfound = 1
@@ -703,19 +704,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         local photos = foundph[i].lrid
                 
         for j, photo in ipairs(photos) do
-          local date = tostring(foundph[i].upldate)
-          date = iso8601ToTime(date)
-          local dateday = LrDate.formatShortDate(date)
-          local datetime = LrDate.formatMediumTime( date )
-
-          photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
-          photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
-          photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
-          photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
-          photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
-          photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
-          photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
-          photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
+          WriteCustomMetaData( publishSettings, photo, foundph[i])
         end
        
     end 
@@ -734,7 +723,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
 
   -- TODO: Download der nicht gefundenen bilder zum Katalog
-  -- TODO: am Ende process rendered photos mit contect aufrufen, um die ImageID in der rendition zu setzen.
+  -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.
   -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
   -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
   -- Metadaten wie auch bei den gefundenen Fotos setzen
@@ -868,18 +857,6 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
       end
     end
   end
-end
-
---(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
--- TODO: direkten Login in die Medien-Bibliothek öffnen
-function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
-  Log('goToPublishedPhoto call')
-  local photo = info.photo
-
-  -- Metadaten aus dem LR Katalog auslesen
-  local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
-  Log('Go to ' .. wpid .. ' in WP-Media-Catalog')
-
 end
 
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
