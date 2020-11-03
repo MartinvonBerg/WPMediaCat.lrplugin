@@ -4,16 +4,15 @@
 --require "strict.lua"
 
 local LrLogger = import "LrLogger"
-
 local Logger = LrLogger( "WP_MediaCat2" ) 
 
 -- log to logfile in ~/Documents/My Documents. Change this to 'print' to log to console
 Logger:enable( "logfile" )
 
 function Log( ... )
-
-	Logger:debug("Log: " .. ArgsToString( {...} ))
-
+	if logDebug then
+		Logger:debug("Log: " .. ArgsToString( {...} ))
+	end
 end
 
 -- being real cheeky and using JSON to convert text to tables

@@ -1,59 +1,40 @@
 --	Main entry point for plugin.
------ Debug -----------
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
---require "strict.lua"
-
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
-local LrView = import 'LrView'
 local LrHttp = import 'LrHttp'
-local LrLogger = import 'LrLogger'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
 local LrExportSession = import 'LrExportSession'
---local LrErrors = import 'LrErrors'
---local LrFtp = import 'LrFtp'
---local LrXml = import 'LrXml'
---local bind = LrView.bind
---local share = LrView.share
 
 JSON=require 'JSON'
 require 'Dialogs'
---require 'Process'
 require 'helpers'
-require 'Logger'
+
+local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
 
 ----- Debug -----------
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
-require "strict"
---require "strict.lua"
+logDebug = true
+require 'strict'
+require 'Logger'
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
-local myLogger = LrLogger( 'WPSynclog' )
-myLogger:enable( "logfile" )
-local function o2L( message )
-	myLogger:trace( message )
-end
 ----- Debug -----------
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo' } -- exportLocation erzeugt den Reiter "Speicherort für Export"
+exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo', 'fileNaming', 'video' } -- exportLocation erzeugt den Reiter "Speicherort für Export"
 exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
 exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
 exportServiceProvider.supportsCustomSortOrder = true  -- this must be set for ordering
---exportServiceProvider.processRenderedPhotos = processRenderedPhotos				-- TODO: see process.lua, integrieren oder umbenennen wie bei ftp-task
 exportServiceProvider.startDialog = dialogs.startDialog							-- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
 exportServiceProvider.sectionsForTopOfDialog = dialogs.sectionsForTopOfDialog -- see dialogs.lua, integrieren oder umbenennen wie bei ftp-task
 exportServiceProvider.exportPresetFields = {
@@ -66,65 +47,58 @@ exportServiceProvider.exportPresetFields = {
   { key = "firstsync", default = false},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
-exportServiceProvider.titleForGoToPublishedPhoto = 'Go to Foto in WP Catalog'
+exportServiceProvider.titleForGoToPublishedPhoto = 'disable' --or 'Go to Foto in WP Catalog'
 exportServiceProvider.disableRenamePublishedCollection = false -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
 
+-- TODO: Nach dem Neustart sind alle Bilder manchmal in republish, manchmal nicht. Scheinbar nur nach wesentlichen Änderungen im Modul
 function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 	Log('metadataThatTriggersRepublish aufgerufen')
 	return {
-    -- TODO: Nach dem Neustart sind alle Bilder in republish
-    --['com.adobe.lightroom.export.wp_mediacat2.*'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    default = false,
+    default = true,
+    label = false,
+		rating = false,
 		title = true,
 		caption = true,
 		keywords = true,
-		gps = true,
-		--dateCreated = false,
+    gps = true,
+    gpsAltitude = true,
+		dateCreated = false,
 		copyright = true,
-		--label = false,
-		--rating = false, 
-	  --customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    ['com.adobe.lightroom.export.wp_mediacat2.gallery'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
   }
 
 end
 
--- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. Bug : rendition is empty
--- aber nPhotos is korrekt
+-- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. 
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
-  --Debug.pauseIfAsked()
   LrMobdebug.on()
 
-  --local LrExportSession = import 'LrExportSession' 
-	local exportSession = exportContext.exportSession
+  local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
   local catalog = LrApplication.activeCatalog()
 	local nPhotos = exportSession:countRenditions()
   local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
   local pseudoPublishSettings = exportSettings['< contents >']
-  
-   local progressScope = exportContext:configureProgress {
-    title = nPhotos > 1
-    and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
-    or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck",
+  local progressScope = exportContext:configureProgress {
+    title = 'Publish to WP', -- laut LR SDK Handbuch wird dieser Titel bei Publish nicht angezeigt
   }
 
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     
     local success, pathOrMessage = rendition:waitForRender()
     local photo = rendition.photo
-    local ImageID
-    local wpid
-    local data
-    
+    local ImageID, wpid, data
+       
     if success then
       progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
       
+      -- Metadaten aus dem LR Katalog auslesen
       wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
       if wpid == nil or wpid == '' then wpid = 0 end
-      
       local photoMeta = {
         caption = photo:getFormattedMetadata('caption'),
         title = photo:getFormattedMetadata( 'title' ),
@@ -132,8 +106,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       }
      
       if tonumber(wpid) > 0 then -- replace image or change state to published after first sync 
-          -- TODO: stimmt nur für first sync! replace image oder update geht nicht!
-          Log(wpid .. ' found. Now updating')
+          -- TODO: stimmt nur für first sync! replace jpg-image-file oder update geht noch  nicht!
+          Log('WPId :' .. wpid .. ' found in Meta. Now updating')
           -- Abfrage: replace nur Metadaten oder das komplette Bild?
           -- nur Änderung von Titel, Bildunterschrift, und Gallery, wenn's mal geht über REST in description, caption, alt_text, title
           -- alle anderen Daten, Bild, GPS : Bild komplett ersetzen, dafür ist eine WP-Funktion erforderlich!
@@ -142,7 +116,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           data = GetMedia(pseudoPublishSettings, wpid) 
           data = ExtractDataFromREST(data)
 
-          -- Prüfung auf Identität, wenn hier Änderung, dann auch in WritephotoMetaToWp
+          -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
           if data['title'] == photoMeta['title'] and  (data['caption'] == photoMeta['title']) then photoMeta['title'] = '' end -- title und caption = title
           if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
             photoMeta['caption'] = '' 
@@ -151,7 +125,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
          
           local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
           if success then
-            Log(wpid .. ' found. Was updated')
+            Log('WpId :' .. wpid .. ' Meta was updated')
             ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
           else
             ImageID = ''
@@ -159,7 +133,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       
       else -- add new image to WP Media Catalog
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
-          Log('Datei: ' .. filename)
+          Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
           local result = 'none'
@@ -169,7 +143,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
             -- fehlende LR-Metadaten in den WP Katalog schreiben
             
-            WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
+            local success = WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( photo, data )
@@ -179,7 +153,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             ImageID = ''
           end
 
-          Log('Upload: ' .. result)
+          Log('Upload created new WPId: ' .. result)
       end
       rendition:recordPublishedPhotoId( ImageID )
     end
@@ -432,9 +406,9 @@ function GetMedia( publishSettings, perpage, page )
       {field='Authorization', value=hash},
     }
    
-  if tonumber(perpage) ~=nil and tonumber(page) ~=nil then
+  if tonumber(perpage) ~= nil and tonumber(page) ~= nil then
 		url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
-  elseif tonumber(perpage) > 0 and tonumber(page) ==nil then
+  elseif tonumber(perpage) > 0 and tonumber(page) == nil then
     url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
   else  
 		url = _siteURL .. "/wp-json/wp/v2/media/"
@@ -546,7 +520,7 @@ end
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   --LrMobdebug.on()
-  o2L('goToPublishedCollection aufgerufen')
+  Log('goToPublishedCollection aufgerufen')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos()
@@ -757,63 +731,11 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end -- if firtsync
 end -- function
 
--- image delete callback: Die callback Funktion selbst fehlt, ebenso POST
--- Geht nicht : gibt eine Fehlermeldung, die nicht zum Absturz führt
---[[function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds )
-function exportServiceProvider.deletePhotosFromPublishedCollection( publishSettings, arrayOfPhotoIds, deletedCallback )
--- REST-API mit Auth und Force zum Löschen
--- Foto aus der Sammlung entfernen
--- Metdaten aus dem Foto löschen
-  o2L('deletePhotosFromPublishedCollection call')
-  --LrMobdebug.on()
-  LrTasks.startAsyncTask(function ()
-    LrMobdebug.on() 
-    --local collection = info.publishedCollection     
-    local catalog = LrApplication.activeCatalog()
-    --local nphotos = collection:getPhotos()
-    --local myPluginID = 'com.adobe.lightroom.export.wp_mediacat2'
-    
-    for i, photoId in ipairs( arrayOfPhotoIds ) do
-      local photo = catalog:findPhotos {
-         searchDesc = {
-           criteria = "all",
-           operation = "==",
-           value = photoId,
-          }      
-     }
-      local aperture = '999'
-      if ((photo ~=nil) and (#photo > 0)) then
-        aperture = photo:getFormattedMetadata( 'aperture' )
-      end
-      Log('Blende: ' .. aperture)
-    end
-    
-  end )
-      
-  for i, photoId in ipairs( arrayOfPhotoIds ) do
-
-    --Log( string.format( "Deleting id: %d", photoId ));
-    Log( "Deleting id: %d" .. photoId );
-    -- local result = Post( "image/delete",  { pid = photoId }, publishSettings )
-    --local ImageID = photoId:getPropertyForPlugin( _PLUGIN, 'wpid' )
-    --local aperture = photoId:getFormattedMetadata( 'aperture' )
-    --local aperture = '99'      
-    --Log('Blende: ' .. aperture)
-    -- call the delete callback even if it fails on the Wordpress end
-    -- ToDo: Need to fix it so REST doesn't return an error if the delete fails
-    --			there's still a potential conflict here if the image is out of kilter between the server and the local.	
-    --if result ~= nil then
-    deletedCallback( photoId ) -- Diese Callback-Funktion ist noch nicht definiert
-    --end
-
-  end
-end
-]]
-
 -- Delete photo from published collection, delete in WP-Media-Catalog, delete MetaData in LR Catalog
 -- Quelle: https://github.com/willthames/photodeck.lrdevplugin : PhotoDeckPublishServiceProvider.lua (Zeilen 313ff)
+-- TODO: vereinfachen!
 exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId)
-  o2L('publishServiceProvider.deletePhotosFromPublishedCollection')
+  Log('publishServiceProvider.deletePhotosFromPublishedCollection')
   --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
@@ -937,115 +859,22 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   end
 end
 
---called when  collection (gallery) is added or renamed.
---[[ hier gibt es wahrsch. keine Funktion
-function exportServiceProvider.updateCollectionSettings( publishSettings, info )
-  --LrMobdebug.on()
-  o2L('updateCollectionSetSettings call')
-  Log( "update Collection Set Settings, creating new album", info.publishedCollection )
-	local data = {}		-- the data table we'll be sending to WP
-
-	local collection = info.publishedCollection
-	local remoteID = collection:getRemoteId()	-- null if not yet published
-
-	data.name = collection:getName()
-
-	-- parenting
-	-- WP needs to add the new album to the parent's list of children.
-	local parentSet = collection:getParent()
-	if parentSet then
-		data.parent = parentSet:getRemoteId()
-	end
-	--Debug.pauseIfAsked()
-
-	if remoteID == nil then	-- remote gallery doesn't exist yet, create new one
-
-		Log( "Creating new gallery", data.name )
-
-		local result = Post( "gallery/create", data, publishSettings )
-
-		if result ~= nil then
-			local gid = result.gid
-			local  catalog = LrApplication.activeCatalog()
-			catalog:withWriteAccessDo( "setGID", function( context )
-				collection:setRemoteId( gid ) -- set remote gallery id
-				Log( "Set remote album id: ", gid )
-				end )
-		end
-	else
-		Log( "Remote Gallery Exists already. Doing nothing")
-	end
-
-end
-]]
-
--- called when a publish collection set (album) is added or changed. (renamed)
---[[ hier gibt es wahrsch. keine Funktion
-function exportServiceProvider.updateCollectionSetSettings( publishSettings, info ) 
-	Log( "update Collection Set Settings, creating new album", info.publishedCollection )
---LrMobdebug.on()
-	--LrTasks.startAsyncTask( function()
-
-		local data = {}		-- the data table we'll be sending to WP
-
-		local collection = info.publishedCollection
-		local remoteID = collection:getRemoteId()	-- null if not yet published
-		data.name = collection:getName()
-
-		-- parenting
-		-- WP needs to add the new album to the parent's list of children.
-		local parentSet = collection:getParent()
-		if parentSet then
-			data.parent = parentSet:getRemoteId()
-		end
-		--Debug.pauseIfAsked()
-		if remoteID == nil then	-- remote album doesn't exist yet, create new one
-		
-			local result = Post( "album/create", data, publishSettings )
-	
-			if result ~= nil then
-
-				local aid = result.aid
-				-- set the remote id for this collection set
-				local  catalog = LrApplication.activeCatalog()
-				catalog:withWriteAccessDo( "setAID", function( context )
-					collection:setRemoteId( aid ) -- set remote gallery id
-					Log( "Set remote album id: ", aid )
-					end )
-			end
-
-		else	-- gallery has been changed in some other way. Rename, possibly?
-			--LrDialogs.showBezel( "Remote Album Exists", 3 )
-			Log( "Remote Album Exists already. Doing nothing")
-		end
-	
-	--end) -- lrTasks
-end 
-]]
-
--- sort order als Variable im PHP in WP einstellen:
---[[hier gibt es also wahrsch. keine Funktion)
-function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
-  o2L('imposeSortOrderOnPublishedCollection call')
-	-- ToDo: LR gives an empty id sequence if count of images is 2 or less. Maybe
-	-- why 2??
-	if #remoteIdSequence == 0 then
-		Log( "Sort: zero length id sequence. Nothing to sort")
-		return
-	end
-	--local result = Post( "gallery/sort", { sequence = remoteIdSequence }, publishSettings )
-end
-]]
 
 --(optional) This plug-in defined callback function is called when the user chooses the "Go to Published Photo" context-menu item.
--- direkten Login in die Medien-Bibliothek öffnen
+-- TODO: direkten Login in die Medien-Bibliothek öffnen
 function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
-  o2L('goToPublishedPhoto call')
+  Log('goToPublishedPhoto call')
+  local photo = info.photo
+
+  -- Metadaten aus dem LR Katalog auslesen
+  local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
+  Log('Go to ' .. wpid .. ' in WP-Media-Catalog')
+
 end
 
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
-  o2L('getCollectionBehaviorInfo call')
+  Log('getCollectionBehaviorInfo call')
   --outputToLog('getCollectionBehaviorInfo aufgerufen')
 	
 	return {

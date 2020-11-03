@@ -13,13 +13,14 @@ return {
 	LrSdkMinimumVersion = 3.0, -- minimum SDK version required by this plug-in
 	LrToolkitIdentifier = 'com.adobe.lightroom.export.wp_mediacat2',
 	LrPluginName = LOC "$$$/WP_MediaCat2/PluginName=WP_MediaCat2",
+
+	LrMetadataProvider  = 'WPMediaCat2Meta.lua', -- Service zur Definition der Metadaten für dieses Plugin-In im angeg. lua-file
 	
 	LrExportServiceProvider = { -- Definition des Export-Service-Proiders von LR für dieses Plugin-In im angeg. lua-file
 		title = LOC "$$$/WP_MediaCat2/WP_MediaCat2-title=WP_MediaCat2",
 		file = 'Main.lua',
 	},
-	LrMetadataProvider  = 'WPMediaCat2Meta.lua', -- Service zur Definition der Metadaten für dieses Plugin-In im angeg. lua-file
-	
+		
 	VERSION = { major=1, minor=4, revision=0, build=1, },
 }
 
