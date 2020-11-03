@@ -67,7 +67,7 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 		dateCreated = false,
 		copyright = true,
     customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    ['com.adobe.lightroom.export.wp_mediacat2.gallery'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    --['com.adobe.lightroom.export.wp_mediacat2.gallery'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
   }
 
 end
@@ -81,10 +81,12 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local exportSettings = exportContext.propertyTable
   local catalog = LrApplication.activeCatalog()
 	local nPhotos = exportSession:countRenditions()
-  local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
+  --local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
   local pseudoPublishSettings = exportSettings['< contents >']
   local progressScope = exportContext:configureProgress {
-    title = 'Publish to WP', -- laut LR SDK Handbuch wird dieser Titel bei Publish nicht angezeigt
+    title = nPhotos > 1
+    and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
+    or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck", -- laut LR SDK Handbuch wird dieser Titel bei Publish nicht angezeigt
   }
 
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
@@ -344,13 +346,13 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   date = iso8601ToTime(date)
   local dateday = LrDate.formatShortDate(date)
   local datetime = LrDate.formatMediumTime( date )
-  --local url = publishSettings['siteURL']
-
+  local url = publishSettings['siteURL']
+  
   photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
   photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
   photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
   photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
-  photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+  --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
   photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
   photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
   photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
@@ -360,8 +362,8 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
   -- set to: http://127.0.0.1/wordpress/wp-admin/post.php?post=4522&action=edit
   --                https://www.mvb1.de/wp-admin/post.php?post=4884&action=edit
-  --url = url .. '/wp-admin/post.php?post=' .. tostring(foundph[i].id) .. '&action=edit'
-  --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
+  url = url .. '/wp-admin/post.php?post=' .. tostring(foundph[i].id) .. '&action=edit'
+  photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
 end
 
 -- Add Media File to WP-Media-Catalog via REST-API
