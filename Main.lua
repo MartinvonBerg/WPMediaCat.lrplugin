@@ -18,6 +18,7 @@ local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch vari
 
 ----- Debug -----------
 logDebug = true
+local DebugSync = true
 require 'strict'
 require 'Logger'
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
@@ -264,80 +265,60 @@ function ExtractDataFromREST( restdata )
   local result = {} 
   result[i] = restdata
   local row = {}
-  local keyfound = false
-  local lrid
-  local w1, w2
+  local lrid, fname, n
 
   local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
-  local ii,j = string.find(str,'full') -- den vollen Filename suchen
+  local ii,j = string.find(str,'original_image') -- den vollen Filename suchen
   if ii ~= nil then
-    keyfound = true  -- Der filename ist in der Rest-Antwort enthalten
+    fname = result[i].media_details.original_image
+  else
+    fname = result[i].media_details.file
+    fname = getfile(fname)
+    fname, n = fname:gsub('-scaled','')
   end
   
-  local _descr = result[i].description.rendered  
-  w1, w2 = string.find(_descr, '<p>.*</p>')
-  if w1 ~=nil and w2 ~= nil then
-    _descr = string.sub(_descr,w1+3,w2-4)
-    w1 = nil
-    w2 = nil
-  else
-    _descr = ''
+  local function findTextinHTML( html )
+    -- find text in HTML-Tag from REST-Api-Data
+    -- Parameter: html : string
+    local w1, w2, text
+    w1, w2 = string.find(html, '<p>.*</p>')
+    if w1 ~=nil and w2 ~= nil then
+      text = string.sub(html,w1+3,w2-4)
+    else
+      text = ''
+    end
+    return text
   end
+
+  local _descr = result[i].description.rendered  
+  _descr = findTextinHTML(_descr)
 
   local _caption = result[i].caption.rendered
-  w1, w2 = string.find(_caption, '<p>.*</p>')
-  if w1 ~=nil and w2 ~= nil then
-    _caption = string.sub(_caption,w1+3,w2-4)
-    w1 = nil
-    w2 = nil
-  else
-    _caption = ''
-  end
+  _caption = findTextinHTML(_caption)
 
-  if keyfound then
-    row = {lrid = {}, id = result[i].id, 
-                      upldate = result[i].date, 
-                      width = result[i].media_details.width, 
-                      height = result[i].media_details.height, 
-                      slug = result[i].slug, 
-                      post = result[i].post, 
-                      gallery = result[i].gallery, 
-                      phurl = result[i].source_url, 
-                      filen = result[i].media_details.sizes.full.file,
-                      datemod = result[i].modified, 
-                      title = result[i].title.rendered,
-                      descr = _descr,  
-                      caption = _caption,
-                      alt  = result[i].alt_text, 
-                      origfile = result[i].media_details.original_image,  -- Fehler, wenn nicht vorhanden?
-          } 
-  else
-    local fname = result[i].media_details.file
-    fname = getfile(fname)
-    row = {lrid = {}, id = result[i].id, 
-                      upldate = result[i].date, 
-                      width = result[i].media_details.width, 
-                      height = result[i].media_details.height, 
-                      slug = result[i].slug, 
-                      post = result[i].post, 
-                      gallery = result[i].gallery, 
-                      phurl = result[i].source_url, 
-                      filen = fname,
-                      datemod = result[i].modified, 
-                      title = result[i].title.rendered,
-                      descr = _descr,  
-                      caption = _caption,
-                      alt  = result[i].alt_text, 
-                      origfile = result[i].media_details.original_image, -- Fehler, wenn nicht vorhanden?
-                    } 
-  end
-
+  row = {lrid = {}, id = result[i].id, 
+                    upldate = result[i].date, 
+                    width = result[i].media_details.width, 
+                    height = result[i].media_details.height, 
+                    slug = result[i].slug, 
+                    post = result[i].post, 
+                    gallery = result[i].gallery, 
+                    phurl = result[i].source_url, 
+                    filen = fname,
+                    datemod = result[i].modified, 
+                    title = result[i].title.rendered,
+                    descr = _descr,  
+                    caption = _caption,
+                    alt  = result[i].alt_text, 
+                    origfile = fname,  -- Fehler, wenn nicht vorhanden?
+        } 
+ 
   return row
 end
 
+-- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
 function WriteCustomMetaData( publishSettings, photo, restmetadata )
-  -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
-  -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
+   -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
   local i = 1
   local foundph = {}
   foundph[i] =  restmetadata
@@ -530,7 +511,7 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  --LrMobdebug.on()
+  LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
@@ -539,10 +520,19 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local result
   local mediatable = {}
   local len = 0
-  local perpage = 10
+  local perpage -- Anzahl der Media-Einträge per REST-Abfrage
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
+  local lrcat = catalog:getPath()
+  lrcat = string.gsub( lrcat,"\\","/")
+  Log('Use Cat: ' .. lrcat)
+
+  if DebugSync then
+    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
+  else
+    perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
+  end
 
   local pscope = LrProgressScope( {
     title = "First Sync WP with LR. Please Wait!",
@@ -551,8 +541,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   if #nphotos == 0 then
     firstsync = true -- Zugriff in processRenderedPhotos nur mit exportContext.propertyTable.firstsync
     publishSettings.firstsync = true
+    --exportContext.propertyTable.firstsync = true
   end
-   
+  
+  -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen
   if (firstsync == true and publishSettings.urlreadable == true) then
     while getmore == true
     do
@@ -566,21 +558,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       while result[i] ~= nil
       do
         local row = {}
-        local keyfound = false
-        local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str imwandeln
-        local ii,j = string.find(str,'full') -- den vollen Filename suchen
-        if ii ~= nil then
-          keyfound = true  -- Der filename ist im Rest enthalten
-		end
-		
-        if keyfound then
-          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = result[i].media_details.sizes.full.file} 
-        else
-          local fname = result[i].media_details.file
-          fname = getfile(fname)
-          row = {lrid = {}, id = result[i].id, upldate = result[i].date, width = result[i].media_details.width, height = result[i].media_details.height, slug = result[i].slug, post = result[i].post, gallery = result[i].gallery, phurl = result[i].source_url, filen = fname} 
-		    end
-        
+        row = ExtractDataFromREST(result[i])
         local index = runs * perpage + i
         mediatable[index] = row
         i = i+1
@@ -589,7 +567,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       if len == perpage then
         getmore = true
         runs = runs +1
-        break -- nur für Testzwecke: zum vozeitigen Abbruch : Debug
+        if DebugSync then break end -- nur für Testzwecke: zum vozeitigen Abbruch : Debug
       else
         getmore = false
       end
@@ -608,23 +586,29 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local p = string.gsub( plugpath,"\\","/")
   local pscopeadd = (0.65 - 0.2) / #mediatable
 
+  ----------------------------------------------------------
+  -- Suchlauf
   for i=1,#mediatable do
       local filen = mediatable[i].filen
       local success = false
       local lrid
-      if filen:find('Chile09_0322',1,true) then -- _1179 _1259
-        local b = '3'
-      end
+      --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
+      --  local b = '3'
+      --end
       
       if #filen > 3 then
       -- suche mit Dateiname aus WP -- TODO: Pfad zum echten und aktiven LR-cat verwenden!
-        success = LrTasks.execute( p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
+        --local        str = p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        --Log(str)
+        --str = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        --Log(str)
+        success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
         lrid = LrFileUtils.readFile( p ..'/test.txt' )
         if #lrid > 9 then lrid = string.sub(lrid,1,7) end
         lrid = tonumber(lrid)
       
         if lrid == nil then 
-          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           local sqltab = {}
           sqltab = sqlread( p .. "/test.txt", '|')
                     
@@ -637,7 +621,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             
             for m=1,#sqltab do
               local id = tostring(sqltab[m][1] - 1)
-              success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
+              success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
               local label = LrFileUtils.readFile( p ..'/collabel.txt' )
               --Wenn CololLabel == 'Rot' dann filen = idx_filename
               if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
@@ -656,7 +640,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         if lrid == nil then
           local base, ext = SplitFilename(filen)
           if base ~= nil then
-            success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
+            success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
@@ -668,7 +652,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
         if lrid == nil then
           filen = replhyphen(filen)
-          success = LrTasks.execute( p.. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)
@@ -690,12 +674,15 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end
   pscope:setPortionComplete(0.65)
   
+  -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
   addToWPColl(collection, searchDesc, foundph) 
-  
+  ------------------------------------------------------------------------
+
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
   pscope:setPortionComplete(0.8)
   LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
   
+  -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
   catalog:withWriteAccessDo( 'AddMetaData', function () 
     for i=1, nfound-1 do
         if i > #foundph then
@@ -710,6 +697,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end 
   end ) -- catalog:withWriteAccessDo
   
+  -- Write csv-File with not found Photos
   for i=1,#foundph do
     if foundph[i].lrid[1] == nil then
       table.insert(notfound,foundph[i])
@@ -717,7 +705,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
   local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-  csvwrite(p2 .. '/notfound.csv',notfound) 
+  csvwrite(p2 .. '/notfound.csv',notfound, ';') 
   
   pscope:done()
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
