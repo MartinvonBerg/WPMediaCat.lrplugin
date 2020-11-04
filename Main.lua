@@ -9,22 +9,29 @@ local LrTasks = import 'LrTasks'
 local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
 local LrExportSession = import 'LrExportSession'
+local LrShell = import 'LrShell'
 
-JSON=require 'JSON'
-require 'Dialogs'
-require 'helpers'
+--JSON=require 'JSON'
+--require 'Dialogs'
+--require 'helpers'
 
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
+local catoutdate = 2 -- in days
+local HDDwritespeed = 100 -- in MBytes / s
 
 ----- Debug -----------
-logDebug = true
-local DebugSync = true
+logDebug = false
+local DebugSync = logDebug
 require 'strict'
 require 'Logger'
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
 ----- Debug -----------
+
+JSON=require 'JSON'
+require 'Dialogs'
+require 'helpers'
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
@@ -43,7 +50,7 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "loginName", default = "" },
 	{ key = "loginPassword", default = "" },
 	{ key = "hash", default = ""},
-	{ key = "pwdok", default = "false"},
+	{ key = "pwdok", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
 }
@@ -231,8 +238,9 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
       n = n + 1
     end
     if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
-      -- TODO: do nothing until field is available via REST-API
-      --local gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ) -- TODO: Dieser Wert ist in Rest noch nicht verfügbar
+      v = urlencode(v)
+      local str = 'gallery=' .. v
+      url = url .. pre(n) .. str
       n = n + 1
     end
     if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
@@ -511,7 +519,7 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  LrMobdebug.on()
+  --LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
@@ -523,10 +531,57 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local perpage -- Anzahl der Media-Einträge per REST-Abfrage
   local getmore = true
   local runs = 0
-  local plugpath = _PLUGIN.path
+
+  local p = string.gsub( _PLUGIN.path,"\\","/")
+  local lrcatactive = catalog:getPath()
+  lrcatactive = string.gsub( lrcatactive,"\\","/") -- check: zu alt, klein, nicht vorhanden
+  local lrcat = p .. "/" .. getfile(lrcatactive)
+
+  -- Prüfe ob der kopierte Katalog vorhanden und aktuell ist
+  local catsuccess = LrFileUtils.exists(lrcat)
+  if catsuccess == 'file' then -- check: zu alt, klein
+    local attrib = LrFileUtils.fileAttributes( lrcat )
+    if tonumber(attrib['fileSize']) < 4096 then catsuccess = false end
+    local filedate = attrib['fileModificationDate'] -- a number of seconds since midnight UTC on January 1, 2001.
+    local currdate = LrDate.currentTime() -- Retrieves the current date and time as a Cocoa date stamp. that is, a number of seconds since midnight UTC on January 1, 2001.
+    if math.abs(currdate - filedate) > (catoutdate * 24 * 60 * 60) then 
+      catsuccess = false 
+      Log('Cat ' .. lrcat .. ' outdated')
+    end
+  end
+
+  if catsuccess == false or catsuccess == 'directory' then
+    local button = LrDialogs.confirm ( "Local Copy of active LR-Catalog not found or outdated",'Press OK to copy ' .. lrcatactive .. ' to ' .. lrcat)
+    if button == 'cancel' then
+      return
+    else
+      -- do copy of active catalog
+      local waittime = math.floor(LrFileUtils.fileAttributes( lrcatactive )['fileSize'] / (1048576 * HDDwritespeed)) -- Mbyte * HDD - write-speed
+      Log('Copy Cat - wait for: ' .. waittime .. ' seconds')
+      lrcatactive = string.gsub( lrcatactive,"/","\\") -- Quelle
+      lrcat = string.gsub( lrcat,"/","\\")              -- Ziel
+      -- LrShell.openPathsViaCommandLine( {goal:string}, cmd:string, source:string)
+      local succ = LrShell.openPathsViaCommandLine( {lrcat}, "copy", lrcatactive )
+      Log(succ)
+      
+      local pscope1 = LrProgressScope( {
+        title = "Copying LR catalogue. Please Wait!",
+      })
+      for i=1,waittime do
+        pscope1:setPortionComplete(i / waittime)
+        LrTasks.sleep(1)
+      end
+      pscope1:done()
+      
+      if not succ then
+        LrDialogs.message ('Could not copy LR-catalog!','','critical')
+        return
+      end
+    end
+  end
 
   if DebugSync then
-    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 3 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -538,7 +593,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   if #nphotos == 0 then
     firstsync = true -- Zugriff in processRenderedPhotos nur mit exportContext.propertyTable.firstsync
     publishSettings.firstsync = true
-    --exportContext.propertyTable.firstsync = true
+    --TODO: exportContext.propertyTable.firstsync = true
   end
   
   -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen
@@ -580,13 +635,9 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local nfound = 1
   local nnotfound = 1
   local searchDesc = {}
-  local p = string.gsub( plugpath,"\\","/")
   local pscopeadd = (0.65 - 0.2) / #mediatable
-  local lrcat = catalog:getPath()
-  lrcat = string.gsub( lrcat,"\\","/")
-  Log('Use Cat: ' .. lrcat)
-  local sqcat1 = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat " 
-  local sqcat2 = p .. "/sqlite3.exe " .. lrcat .. ' '
+  local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
+  Log('Use Cat: ' .. sqcat1)
 
   ----------------------------------------------------------
   -- Suchlauf
@@ -600,20 +651,13 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
       if #filen > 3 then
       -- suche mit Dateiname aus WP -- TODO: Pfad zum echten und aktiven LR-cat verwenden!
-        local        str = p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        Log(str)
-        str = sqcat2 .. "\"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        str = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        Log(str)
-        str = sqcat1 .. "\"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        Log(str)
-        success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
+        success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
         lrid = LrFileUtils.readFile( p ..'/test.txt' )
         if #lrid > 9 then lrid = string.sub(lrid,1,7) end
         lrid = tonumber(lrid)
       
         if lrid == nil then 
-          success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           local sqltab = {}
           sqltab = sqlread( p .. "/test.txt", '|')
                     
@@ -626,7 +670,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             
             for m=1,#sqltab do
               local id = tostring(sqltab[m][1] - 1)
-              success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
+              success = LrTasks.execute( sqcat1 .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
               local label = LrFileUtils.readFile( p ..'/collabel.txt' )
               --Wenn CololLabel == 'Rot' dann filen = idx_filename
               if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
@@ -645,7 +689,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         if lrid == nil then
           local base, ext = SplitFilename(filen)
           if base ~= nil then
-            success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
+            success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
@@ -657,7 +701,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
         if lrid == nil then
           filen = replhyphen(filen)
-          success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)
@@ -854,9 +898,10 @@ end
 
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
+  LrMobdebug.on()
+  logDebug = publishSettings.pwdok
   Log('getCollectionBehaviorInfo call')
-  --outputToLog('getCollectionBehaviorInfo aufgerufen')
-	
+  	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
 		defaultCollectionCanBeDeleted = true,

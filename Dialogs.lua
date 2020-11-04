@@ -13,6 +13,7 @@ local LrView = import 'LrView'
 local LrDialogs = import 'LrDialogs'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrColor = import 'LrColor'
+local share = LrView.share
 require 'Post'
 
 ------------- Debug ----------------------
@@ -41,7 +42,13 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
-                    EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
+					EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
+					f:row {
+						f:checkbox {
+							title = "Check for Test-Mode",
+							value = bind 'pwdok',
+						},
+					},
 					f:row {
 						fill_horizontal = true,				
 						f:push_button {    -- Button mit Callback-Aufruf, der den hash-value zur Authentifizierung prüft
@@ -55,7 +62,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 										local str = inspect(result) 
 										local length = string.len( str )
 										str = string.sub(str,4,length-3)  
-										propertyTable.msgBox = "Login Test Returned OK with result: \n" .. str
+										propertyTable.msgBox = "Login Test Returned OK with result: \n" .. str --.. "\n Test-Mode: " .. propertyTable.pwdok
 										--propertyTable.msgBox = str
 										Log( "Login Test returned: ", str )  -- Debugging
 									else

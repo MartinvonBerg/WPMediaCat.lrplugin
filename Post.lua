@@ -23,7 +23,10 @@ function CheckLogin( publishSettings )
 	--LrMobdebug.on()
 	local ReturnTable = {} 
 	local hash = 'Basic ' .. publishSettings.hash 
-  --local hash = 'Basic Og=='   -- Debugging
+	publishSettings.hash = ''
+	local uid = publishSettings.loginName
+	local pwd = publishSettings.loginPassword
+    local hash = 'Basic ' .. encb64(uid .. ':' .. pwd)   -- Debugging
 	local httphead = {
       {field='Authorization', value=hash},
       }
@@ -40,14 +43,14 @@ function CheckLogin( publishSettings )
 		local result, headers = LrHttp.post( url, '', httphead )
     
 		if headers.status == 500 then
-			ReturnTable['error'] = 'Login failed! Check Password / hash-value'
+			ReturnTable['error'] = 'Login failed! Check Username and Password.'
 		elseif headers.status == 404 then
-			ReturnTable['success'] = 'Sucess. Login-OK!'
-			publishSettings.pwdok = 'true'
+			ReturnTable['success'] = 'Sucess. Login-OK! with hash-Method:    ' .. hash
+			publishSettings.hash = encb64(uid .. ':' .. pwd)
 			result = JSON:decode(result)  -- Debugging
 			Log(result)  -- Debugging
 		else
-      		ReturnTable['error'] = 'Site reachable, but unknown error'
+      		ReturnTable['error'] = 'Site reachable, but unknown error.'
     	end
 		return ReturnTable, nil
     
