@@ -524,9 +524,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local getmore = true
   local runs = 0
   local plugpath = _PLUGIN.path
-  local lrcat = catalog:getPath()
-  lrcat = string.gsub( lrcat,"\\","/")
-  Log('Use Cat: ' .. lrcat)
 
   if DebugSync then
     perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
@@ -585,6 +582,11 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local searchDesc = {}
   local p = string.gsub( plugpath,"\\","/")
   local pscopeadd = (0.65 - 0.2) / #mediatable
+  local lrcat = catalog:getPath()
+  lrcat = string.gsub( lrcat,"\\","/")
+  Log('Use Cat: ' .. lrcat)
+  local sqcat1 = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat " 
+  local sqcat2 = p .. "/sqlite3.exe " .. lrcat .. ' '
 
   ----------------------------------------------------------
   -- Suchlauf
@@ -598,17 +600,20 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
       if #filen > 3 then
       -- suche mit Dateiname aus WP -- TODO: Pfad zum echten und aktiven LR-cat verwenden!
-        --local        str = p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        --Log(str)
-        --str = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
-        --Log(str)
+        local        str = p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        Log(str)
+        str = sqcat2 .. "\"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        str = p .. "/sqlite3.exe ".. p .. "/Lightroom-2.lrcat \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        Log(str)
+        str = sqcat1 .. "\"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt"
+        Log(str)
         success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
         lrid = LrFileUtils.readFile( p ..'/test.txt' )
         if #lrid > 9 then lrid = string.sub(lrid,1,7) end
         lrid = tonumber(lrid)
       
         if lrid == nil then 
-          success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           local sqltab = {}
           sqltab = sqlread( p .. "/test.txt", '|')
                     
@@ -621,7 +626,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             
             for m=1,#sqltab do
               local id = tostring(sqltab[m][1] - 1)
-              success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
+              success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
               local label = LrFileUtils.readFile( p ..'/collabel.txt' )
               --Wenn CololLabel == 'Rot' dann filen = idx_filename
               if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
@@ -640,7 +645,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         if lrid == nil then
           local base, ext = SplitFilename(filen)
           if base ~= nil then
-            success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
+            success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
@@ -652,7 +657,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
         if lrid == nil then
           filen = replhyphen(filen)
-          success = LrTasks.execute( p.. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+          success = LrTasks.execute( p .. "/sqlite3.exe " .. lrcat .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)

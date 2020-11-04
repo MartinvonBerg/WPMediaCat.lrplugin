@@ -81,6 +81,8 @@ function csvwrite(path, data, sep)
 
 function getfile(path, sep)
 	-- get filename of Path (the value after the last '/')
+	local n
+	path, n = path:gsub('\\','/')
 	sep = sep or '/'
 	path = path:reverse()
 	local index = 0
