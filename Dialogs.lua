@@ -42,11 +42,11 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
-					EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
+					-- EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
 					f:row {
 						f:checkbox {
 							title = "Check for Test-Mode",
-							value = bind 'pwdok',
+							value = bind 'DebugMode',
 						},
 					},
 					f:row {
@@ -62,7 +62,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 										local str = inspect(result) 
 										local length = string.len( str )
 										str = string.sub(str,4,length-3)  
-										propertyTable.msgBox = "Login Test Returned OK with result: \n" .. str --.. "\n Test-Mode: " .. propertyTable.pwdok
+										propertyTable.msgBox = "Login Test returned: \n" .. str
 										--propertyTable.msgBox = str
 										Log( "Login Test returned: ", str )  -- Debugging
 									else
@@ -77,7 +77,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						f:static_text {
 							title = bind( 'msgBox'),
 							height_in_lines = 6,
-							text_color = LrColor( 1, 0, 0 ),
+							--text_color = LrColor( 1, 0, 0 ),
 							fill_horizontal = 1
 						}
 					},

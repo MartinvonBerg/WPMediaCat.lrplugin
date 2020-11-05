@@ -20,10 +20,10 @@ local catoutdate = 2 -- in days
 local HDDwritespeed = 100 -- in MBytes / s
 
 ----- Debug -----------
-logDebug = false
-local DebugSync = logDebug
-require 'strict'
+--logDebug = false
+--require 'strict'
 require 'Logger'
+local DebugSync = logDebug
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -50,13 +50,13 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "loginName", default = "" },
 	{ key = "loginPassword", default = "" },
 	{ key = "hash", default = ""},
-	{ key = "pwdok", default = false}, -- Currently used for Debugging activation
+	{ key = "DebugMode", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'disable' --or 'Go to Foto in WP Catalog'
-exportServiceProvider.disableRenamePublishedCollection = false -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
+exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
 
@@ -899,7 +899,7 @@ end
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   LrMobdebug.on()
-  logDebug = publishSettings.pwdok
+  --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
   	
 	return {

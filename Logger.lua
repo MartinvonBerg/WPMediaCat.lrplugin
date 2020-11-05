@@ -5,7 +5,7 @@
 
 local LrLogger = import "LrLogger"
 local Logger = LrLogger( "WP_MediaCat2" ) 
-
+logDebug = true
 -- log to logfile in ~/Documents/My Documents. Change this to 'print' to log to console
 Logger:enable( "logfile" )
 

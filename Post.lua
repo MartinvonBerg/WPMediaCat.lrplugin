@@ -19,45 +19,36 @@ local LrHttp = import( 'LrHttp' )
 
 -- Check Login given in PublishSettings
 function CheckLogin( publishSettings ) 
-	
+	Log('Debug: ' .. tostring(logDebug))
 	--LrMobdebug.on()
 	local ReturnTable = {} 
-	local hash = 'Basic ' .. publishSettings.hash 
+	--local hash = 'Basic ' .. publishSettings.hash 
 	publishSettings.hash = ''
 	local uid = publishSettings.loginName
 	local pwd = publishSettings.loginPassword
-    local hash = 'Basic ' .. encb64(uid .. ':' .. pwd)   -- Debugging
+    local hash = 'Basic ' .. encb64(uid .. ':' .. pwd)   
 	local httphead = {
       {field='Authorization', value=hash},
       }
   
 	local url = publishSettings.siteURL .. "/wp-json/wp/v2/"
-	Log(url)  -- Debugging
-	Log(hash) -- Debugging
-	local result, headers = LrHttp.get( url )
+	Log('url: ' .. url)  -- Debugging
+	Log('hash-value: ' .. hash) -- Debugging
+
+	local result, headers = LrHttp.get( url ) -- GET-Anfrage ohne Auth
 
 	if headers.status == 200 then
 		ReturnTable['warning'] = 'REST-API (GET) of site can be reached without PWD! Check OAuth!'
-		publishSettings.urlreadable = true
-
-		local result, headers = LrHttp.post( url, '', httphead )
-    
-		if headers.status == 500 then
-			ReturnTable['error'] = 'Login failed! Check Username and Password.'
-		elseif headers.status == 404 then
-			ReturnTable['success'] = 'Sucess. Login-OK! with hash-Method:    ' .. hash
-			publishSettings.hash = encb64(uid .. ':' .. pwd)
-			result = JSON:decode(result)  -- Debugging
-			Log(result)  -- Debugging
-		else
-      		ReturnTable['error'] = 'Site reachable, but unknown error.'
-    	end
-		return ReturnTable, nil
-    
 	elseif headers.status == 401 then
        	result = JSON:decode(result)
     	local str = 'GET-Req w/o Auth blocked. Authorization required. ' .. result.message
 		ReturnTable['error'] = str
+	else
+		ReturnTable['error'] = 'Cannot Reach Site. Unknown Error'
+		Log('Site not reached: ' .. headers.status)
+	end
+	
+	if headers.status == 200 or headers.status == 401 then
 		publishSettings.urlreadable = true
 
 		local result, headers = LrHttp.post( url, '', httphead )
@@ -72,10 +63,7 @@ function CheckLogin( publishSettings )
 		else
       		ReturnTable['error'] = 'Site reachable, but unknown error.'
     	end
-		return ReturnTable, nil
-  	else
-    	ReturnTable['error'] = 'Unknown Error'
-  	end
+	end
   
   return ReturnTable, nil
  end
