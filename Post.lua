@@ -56,8 +56,23 @@ function CheckLogin( publishSettings )
     
 	elseif headers.status == 401 then
        	result = JSON:decode(result)
-    	local str = 'REST-API blocked. Authorization required. ' .. result.message
-    	ReturnTable['warning'] = str
+    	local str = 'GET-Req w/o Auth blocked. Authorization required. ' .. result.message
+		ReturnTable['error'] = str
+		publishSettings.urlreadable = true
+
+		local result, headers = LrHttp.post( url, '', httphead )
+    
+		if headers.status == 500 then
+			ReturnTable['error'] = 'Login failed! Check Username and Password.'
+		elseif headers.status == 404 then
+			ReturnTable['success'] = 'Sucess. Login-OK! with hash-Method:    ' .. hash
+			publishSettings.hash = encb64(uid .. ':' .. pwd)
+			result = JSON:decode(result)  -- Debugging
+			Log(result)  -- Debugging
+		else
+      		ReturnTable['error'] = 'Site reachable, but unknown error.'
+    	end
+		return ReturnTable, nil
   	else
     	ReturnTable['error'] = 'Unknown Error'
   	end
