@@ -140,6 +140,13 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           else
             ImageID = ''
           end
+          -- TODO: Nicht durchführen bei FirstSync!
+          local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
+          Log('Updating File: ' .. filename .. ' to WP')
+          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
+          Log('Rendition-Datei: ' .. renditionFilePath)
+          local result = 'none'
+          result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
       
       else -- add new image to WP Media Catalog
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
@@ -389,6 +396,39 @@ function AddNewMedia( publishSettings, filename, path )
   return wpid, restData
 end
 
+-- Update Media File to WP-Media-Catalog via REST-API
+function UpdateMedia( publishSettings, filename, path, wpid ) 
+  local hash = 'Basic ' .. publishSettings['hash']
+  local filen = filename
+  local restData = {}
+
+  if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
+    return
+  end
+
+	local httphead = {
+      {field='Authorization', value=hash},
+      {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
+      {field='Content-Type', value='image/jpeg'},
+    }
+
+  local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+    
+  local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/wpcat/v1/update/" .. tostring(wpid)
+    
+	local result, headers = LrHttp.post( url, imgfile, httphead )
+
+	if headers.status == 200 then
+      result = JSON:decode(result)
+      --wpid = tonumber(result['id'])
+      --restData = ExtractDataFromREST(result)
+  else
+    	wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+  end
+  
+  return wpid, result
+end
+
 -- Get all Media Files from WP-Media-Catalog via REST-API
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 function GetMedia( publishSettings, perpage, page ) 
@@ -581,7 +621,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end
 
   if DebugSync then
-    perpage = 3 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 10 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
