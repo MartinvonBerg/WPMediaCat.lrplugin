@@ -53,6 +53,7 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "DebugMode", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
+  { key = "wpplugin", default = false},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'disable' --or 'Go to Foto in WP Catalog'
@@ -350,7 +351,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
   --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
   photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
-  photo:setPropertyForPlugin( _PLUGIN,'post', tostring(foundph[i].post))
+  photo:setPropertyForPlugin( _PLUGIN,'post', url .. "/?p=" .. tostring(foundph[i].post)) -- 
   photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
 
   -- set to: http://127.0.0.1/wordpress/wp-content/uploads/2020/11/Wanderung-Achquacheta-38-scaled.jpg
@@ -471,6 +472,7 @@ function DeleteMedia( publishSettings, wpmediaid )
     return result
   end
 
+  -- TODO: Check whether it is really the correct file to delete
 	local hash = 'Basic ' .. publishSettings.hash
 	local httphead = {
       {field='Authorization', value=hash},
@@ -941,6 +943,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   LrMobdebug.on()
   --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
+  Log('WP-Plugin installed: ', publishSettings.wpplugin)
   	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",

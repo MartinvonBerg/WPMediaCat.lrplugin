@@ -62,7 +62,25 @@ function CheckLogin( publishSettings )
 			Log(result)  -- Debugging
 		else
       		ReturnTable['error'] = 'Site reachable, but unknown error.'
-    	end
+		end
+		-- Check Install of Plugin for communication via REST-API
+		url = publishSettings.siteURL .. "/wp-json/wp/v2/plugins"
+		local result, headers = LrHttp.get( url, httphead )
+		if headers.status == 200 then
+			local str = inspect(result) -- JSON-Rückgabe für ein Image in str umwandeln
+			local i,j = string.find(result,'wp_wpcat_json_rest') 
+			if i ~= nil then 
+				ReturnTable['plugin'] = 'OK. Wordpress Plugin installed'
+				publishSettings.wpplugin = true
+			else
+				ReturnTable['plugin'] = 'Plugin not installed. Many functions won\'t work!'
+				publishSettings.wpplugin = false
+			end
+		else
+			ReturnTable['plugin'] = 'Unknown Error while searching for Plugin'
+			publishSettings.wpplugin = false
+		end
+
 	end
   
   return ReturnTable, nil
