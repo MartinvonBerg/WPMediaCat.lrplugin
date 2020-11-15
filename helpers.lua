@@ -46,8 +46,8 @@ end
 
 -- iso8601ToTime(dateTimeISO8601) : returns Cocoa timestamp as used all through out Lr  
 function iso8601ToTime(dateTimeISO8601)
-	-- ISO8601: YYYY-MM-DD{THH:mm:{ss{Zssss}}
-	-- date is mandatory, time as whole, seconds and timezone may or may not be present, e.g.:
+    -- ISO8601: YYYY-MM-DD{THH:mm:{ss{Zssss}}
+    -- date is mandatory, time as whole, seconds and timezone may or may not be present, e.g.:
         --	srcDateTimeISO8601 = '2016-07-06T17:16:15Z-3600'
         --	srcDateTimeISO8601 = '2016-07-06T17:16:15Z'
         --	srcDateTimeISO8601 = '2016-07-06T17:16:15'

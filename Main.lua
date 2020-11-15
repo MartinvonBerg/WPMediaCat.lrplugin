@@ -111,7 +111,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' ) 
       if wpid == nil or wpid == '' or wpid == 'nil' then wpid = 0 end
       local photoMeta = {
-        caption = photo:getFormattedMetadata('caption'),
+        caption = photo:getFormattedMetadata( 'caption' ),
         title = photo:getFormattedMetadata( 'title' ),
         gallery = photo:getPropertyForPlugin( mypluginID, 'gallery' ),
       }
@@ -472,8 +472,7 @@ function DeleteMedia( publishSettings, wpmediaid )
     return result
   end
 
-  -- TODO: Check whether it is really the correct file to delete
-	local hash = 'Basic ' .. publishSettings.hash
+  local hash = 'Basic ' .. publishSettings.hash
 	local httphead = {
       {field='Authorization', value=hash},
     }
@@ -817,20 +816,22 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   Log('publishServiceProvider.deletePhotosFromPublishedCollection')
   --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
-  local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
-  local galleryId = collection:getRemoteId()
   local photoIdsToDelete = {}
   local photoIdsToUnpublish = {}
   local LrPhotosToDelete = {}
+  local publishedPhotoById = {}
   local result
   local error_msg
+  
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
+  local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
+  local galleryId = collection:getRemoteId()
   local publishedPhotos = collection:getPublishedPhotos()
-  local publishedPhotoById = {}
-
+  
   for _, pp in pairs(publishedPhotos) do
     publishedPhotoById[pp:getRemoteId()] = pp
   end
+
   for i, photoId in ipairs( arrayOfPhotoIds ) do
     error_msg = nil
     if photoId ~= "" then
@@ -855,19 +856,38 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   end
   
   LrTasks.startAsyncTask(function ()
-   
+    local hash = 'Basic ' .. publishSettings.hash
+	  local httphead = {
+      {field='Authorization', value=hash},
+    }
     local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch Variable ersetzen
 
     for i, photo in ipairs( LrPhotosToDelete ) do
-      --local aperture = '999'
-      --local photo2 = LrPhotosToDelete[i]
-      --local photo3 = photo:getPhoto()
-      --aperture = photo:getFormattedMetadata( 'aperture' )
       local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
       if wpid == nil then wpid = 0 end
       local success = false
+      local difftime = -1
+      local lrtime = photo:getRawMetadata( 'dateTimeOriginal' ) --  "17.10.2020 12:21:08" dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
+      Log('LR dateTimeOriginal: ', lrtime)
+      lrtime = LrDate.timeToPosixDate(lrtime)
+      local wptime = 0
+      Log('LR dateTimeOriginal: ', lrtime)
+  
+      -- Check timestamps before delete
+      local url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpid)   
+      Log('Delete check url: ', url)
+      Log('Delete http hash: ', hash)
+      local result, headers = LrHttp.get( url, httphead )
+      if headers.status == 200 then
+        result = JSON:decode(result)
+        wptime = tonumber(result["media_details"]["image_meta"]["created_timestamp"])
+        Log('wp created_timestamp: ', wptime)
+        difftime = (wptime - lrtime) % 3600
+        Log('Timediff: ', difftime)
+      end
       
-      if tonumber(wpid) > 0 then
+
+      if (tonumber(wpid) > 0) and (difftime == 0) then
         success = DeleteMedia(publishSettings, wpid)
       end
 

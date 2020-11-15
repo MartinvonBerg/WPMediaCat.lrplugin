@@ -6,7 +6,7 @@ by Martin von Berg
 
 ------------- Debug ----------------------
 
---ocal Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
+--local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
 --local Debug = require "Debug".init ()
 --require 'strict.lua'
 local inspect = require 'inspect'
@@ -63,9 +63,11 @@ function CheckLogin( publishSettings )
 		else
       		ReturnTable['error'] = 'Site reachable, but unknown error.'
 		end
+
 		-- Check Install of Plugin for communication via REST-API
 		url = publishSettings.siteURL .. "/wp-json/wp/v2/plugins"
 		local result, headers = LrHttp.get( url, httphead )
+		
 		if headers.status == 200 then
 			local str = inspect(result) -- JSON-Rückgabe für ein Image in str umwandeln
 			local i,j = string.find(result,'wp_wpcat_json_rest') 
