@@ -21,7 +21,7 @@ local HDDwritespeed = 100 -- in MBytes / s
 
 ----- Debug -----------
 --logDebug = false
---require 'strict'
+require 'strict'
 require 'Logger'
 local DebugSync = logDebug
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
@@ -622,7 +622,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end
 
   if DebugSync then
-    perpage = 10 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -816,8 +816,6 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   Log('publishServiceProvider.deletePhotosFromPublishedCollection')
   --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
-  local photoIdsToDelete = {}
-  local photoIdsToUnpublish = {}
   local LrPhotosToDelete = {}
   local publishedPhotoById = {}
   local result
@@ -833,25 +831,10 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   end
 
   for i, photoId in ipairs( arrayOfPhotoIds ) do
-    error_msg = nil
     if photoId ~= "" then
       local publishedPhoto = publishedPhotoById[photoId]
       local catphoto = publishedPhoto:getPhoto()
       table.insert(LrPhotosToDelete, catphoto)
-      local collCount = 0
-      for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
-        if c:getRemoteId() ~= galleryId then
-          collCount = collCount + 1
-        end
-      end
-
-      if collCount == 0 then
-        -- delete photo if this is the only collection it's in
-        table.insert(photoIdsToDelete, photoId)
-      else
-        -- otherwise unpublish from the passed in collection
-        table.insert(photoIdsToUnpublish, photoId)
-      end
     end
   end
   
@@ -860,23 +843,21 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
 	  local httphead = {
       {field='Authorization', value=hash},
     }
-    local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch Variable ersetzen
-
+    
     for i, photo in ipairs( LrPhotosToDelete ) do
-      local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
+      local wpid = photo:getPropertyForPlugin( _PLUGIN, 'wpid' )
       if wpid == nil then wpid = 0 end
       local success = false
+
+      -- Check timestamps before delete
       local difftime = -1
-      local lrtime = photo:getRawMetadata( 'dateTimeOriginal' ) --  "17.10.2020 12:21:08" dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
+      local lrtime = photo:getRawMetadata( 'dateTimeOriginal' ) --  dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
       Log('LR dateTimeOriginal: ', lrtime)
       lrtime = LrDate.timeToPosixDate(lrtime)
-      local wptime = 0
       Log('LR dateTimeOriginal: ', lrtime)
-  
-      -- Check timestamps before delete
+      local wptime = 0
+      
       local url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpid)   
-      Log('Delete check url: ', url)
-      Log('Delete http hash: ', hash)
       local result, headers = LrHttp.get( url, httphead )
       if headers.status == 200 then
         result = JSON:decode(result)
@@ -885,8 +866,7 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
         difftime = (wptime - lrtime) % 3600
         Log('Timediff: ', difftime)
       end
-      
-
+    
       if (tonumber(wpid) > 0) and (difftime == 0) then
         success = DeleteMedia(publishSettings, wpid)
       end
@@ -902,60 +882,12 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
           photo:setPropertyForPlugin( _PLUGIN,'post', '')
           photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
         end )
-        Log('WP-Media deleted: ' ..tostring(wpid).. '  ' .. tostring(success))
+        Log('WP-Media deleted: ' ..tostring(wpid).. ' LR-RemoteID ' .. tostring(photo:getRemoteId()))
+        deletedCallback(photo:getRemoteId())
       end
     end
   end )
-
-  -- Unpublish
-  local photoIdsToUnpublishCount = #photoIdsToUnpublish
-  if photoIdsToUnpublishCount == 1 then
-    -- Only one photo needs to be unpublished. Use non batched API endpoint.
-    local photoId = photoIdsToUnpublish[1]
-    --result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
-
-    if error_msg then
-      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
-    else
-      deletedCallback(photoId)
-    end
-  elseif photoIdsToUnpublishCount > 0 then
-    -- More than one photo needs to be unpublished. Use batched API endpoint.
-    --result, error_msg = PhotoDeckAPI.unpublishPhotos(photoIdsToUnpublish, galleryId)
-
-    if error_msg then
-      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhotos=Error unpublishing photos: ^1", error_msg))
-    else
-      for _, photoId in ipairs(photoIdsToUnpublish) do
-        deletedCallback(photoId)
-      end
-    end
-  end
-
-  -- Delete
-  local photoIdsToDeleteCount = #photoIdsToDelete
-  if photoIdsToDeleteCount == 1 then
-    -- Only one photo needs to be deleted. Use non batched API endpoint.
-    local photoId = photoIdsToDelete[1]
-    --result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
-
-    if error_msg then
-      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
-    else
-      deletedCallback(photoId)
-    end
-  elseif photoIdsToDeleteCount > 0 then
-    -- More than one photo needs to be deleted. Use batched API endpoint.
-    --result, error_msg = PhotoDeckAPI.deletePhotos(photoIdsToDelete)
-
-    if error_msg then
-      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhotos=Error deleting photos: ^1", error_msg))
-    else
-      for _, photoId in ipairs(photoIdsToDelete) do
-        deletedCallback(photoId)
-      end
-    end
-  end
+  
 end
 
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
