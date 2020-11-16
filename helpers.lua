@@ -62,7 +62,7 @@ end
 
 function csvwrite(path, data, sep)
 	-- write csv-file data to path with given seperator sep
-	  sep = sep or ','
+	  sep = sep or ';'
 	  local file = assert(io.open(path, "w"))
 	  for i=1,#data do
 		  local j = 1

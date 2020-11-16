@@ -8,10 +8,10 @@ by Martin von Berg
 
 --local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
 --local Debug = require "Debug".init ()
---require 'strict.lua'
+require 'strict.lua'
 local inspect = require 'inspect'
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 
 ----------------------------------------
 
@@ -20,7 +20,7 @@ local LrHttp = import( 'LrHttp' )
 -- Check Login given in PublishSettings
 function CheckLogin( publishSettings ) 
 	Log('Debug: ' .. tostring(logDebug))
-	--LrMobdebug.on()
+	LrMobdebug.on()
 	local ReturnTable = {} 
 	--local hash = 'Basic ' .. publishSettings.hash 
 	publishSettings.hash = ''
@@ -41,8 +41,8 @@ function CheckLogin( publishSettings )
 		ReturnTable['warning'] = 'REST-API (GET) of site can be reached without PWD! Check OAuth!'
 	elseif headers.status == 401 then
        	result = JSON:decode(result)
-    	local str = 'GET-Req w/o Auth blocked. Authorization required. ' .. result.message
-		ReturnTable['error'] = str
+    	local str = 'OK. GET-Req without Auth. blocked. Authorization required. ' -- .. result.message
+		ReturnTable['Authentification'] = str
 	else
 		ReturnTable['error'] = 'Cannot Reach Site. Unknown Error'
 		Log('Site not reached: ' .. headers.status)
@@ -71,9 +71,24 @@ function CheckLogin( publishSettings )
 		if headers.status == 200 then
 			local str = inspect(result) -- JSON-Rückgabe für ein Image in str umwandeln
 			local i,j = string.find(result,'wp_wpcat_json_rest') 
-			if i ~= nil then 
-				ReturnTable['plugin'] = 'OK. Wordpress Plugin installed'
-				publishSettings.wpplugin = true
+			local pluginstatus
+			local pluginversion
+
+			if i ~= nil then
+				result = JSON:decode(result) 
+				for k = 1, #result do
+					if result[k]['textdomain'] == "wp_wpcat_json_rest" then
+						pluginstatus = result[k]['status']
+						pluginversion = result[k]['version']
+					end
+				end
+				if pluginstatus == 'active' then
+					ReturnTable['plugin'] = 'OK. Wordpress Plugin installed and active. Version: ' .. tostring(pluginversion)
+					publishSettings.wpplugin = true
+				else
+					ReturnTable['plugin'] = 'OK. Wordpress Plugin installed but not activated! Version: ' .. tostring(pluginversion)
+					publishSettings.wpplugin = false
+				end
 			else
 				ReturnTable['plugin'] = 'Plugin not installed. Many functions won\'t work!'
 				publishSettings.wpplugin = false
