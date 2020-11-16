@@ -11,9 +11,6 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrExportSession = import 'LrExportSession'
 local LrShell = import 'LrShell'
 
---JSON=require 'JSON'
---require 'Dialogs'
---require 'helpers'
 
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
 local catoutdate = 2 -- in days
@@ -151,6 +148,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       
       else -- add new image to WP Media Catalog
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
+          filename = filename:gsub('dng','jpg')
+          filename = filename:gsub('DNG','jpg')
           Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
@@ -159,20 +158,21 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           
           if type(result) == 'number' then
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
-            -- fehlende LR-Metadaten in den WP Katalog schreiben
             
+            -- fehlende LR-Metadaten in den WP Katalog schreiben
             local success = WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
+            
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
 
           else
-            ImageID = ''
+            ImageID = nil
           end
-
           Log('Upload created new WPId: ' .. result)
       end
+      
       rendition:recordPublishedPhotoId( ImageID )
     end
     -- delete temp file. There is a cleanup step that happens later, but this will help manage space in the event of a large upload.
@@ -349,13 +349,15 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
   photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
   photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
-  --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
   photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
-  photo:setPropertyForPlugin( _PLUGIN,'post', url .. "/?p=" .. tostring(foundph[i].post)) -- 
   photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
 
-  -- set to: http://127.0.0.1/wordpress/wp-content/uploads/2020/11/Wanderung-Achquacheta-38-scaled.jpg
-  --                    https://www.mvb1.de/smrtzl/uploads/2020/10/Bike-Hike-Lago-Lansfero-282.jpg
+  if tonumber(foundph[i].post) > 0 then
+    photo:setPropertyForPlugin( _PLUGIN,'post', url .. "/?p=" .. tostring(foundph[i].post)) -- 
+  else
+    photo:setPropertyForPlugin( _PLUGIN,'post', '')
+  end
+
   --photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
   -- set to: http://127.0.0.1/wordpress/wp-admin/post.php?post=4522&action=edit
   --                https://www.mvb1.de/wp-admin/post.php?post=4884&action=edit
@@ -486,6 +488,9 @@ function DeleteMedia( publishSettings, wpmediaid )
 	if headers.status == 200 then
       result = JSON:decode(result)
       result = result['deleted']
+  elseif headers.status == 404 then -- also successful, id is not available
+      result = JSON:decode(result)
+      result = result['code']
   end
   
   return result
@@ -816,9 +821,7 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   Log('publishServiceProvider.deletePhotosFromPublishedCollection')
   LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
-  local LrPhotosToDelete = {}
   local publishedPhotoById = {}
-  local photoIdsToUnpublish = {}
   local photoUnpublish = {}
   local result
   local error_msg = 'nix'
@@ -836,25 +839,21 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
     if photoId ~= "" then
       local publishedPhoto = publishedPhotoById[photoId]
       local catphoto = publishedPhoto:getPhoto()
-      table.insert(LrPhotosToDelete, catphoto)
-      table.insert(photoIdsToUnpublish, photoId)
       photoUnpublish[i] = {}
       photoUnpublish[i][1] = catphoto -- lr cat id
       photoUnpublish[i][2] = photoId  -- remote id
-      photoUnpublish[i][3] = true  -- remote id
-      photoUnpublish[i][4] = publishedPhoto
+      photoUnpublish[i][3] = publishedPhoto
+      photoUnpublish[i][4] = true  -- remote id
     end
   end
   
-  --LrFunctionContext.postAsyncTaskWithContext( 'deletePhotos', function( context )
   LrTasks.startAsyncTask(function ()
     LrMobdebug.on()
     local hash = 'Basic ' .. publishSettings.hash
 	  local httphead = {
       {field='Authorization', value=hash},
     }
-    local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch Variable ersetzen
-    
+        
     for i=1, #photoUnpublish do
       local photo = photoUnpublish[i][1]
       local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
@@ -875,6 +874,7 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
         local url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpid)   
         Log ('Timestamp-URL: ', url)
         local result, headers = LrHttp.get( url, httphead )
+        
         if headers.status == 200 then
           result = JSON:decode(result)
           if result['media_details'] ~= nil then
@@ -884,15 +884,21 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
           difftime = (wptime - lrtime) -- % 3600
           Log('Timediff: ', difftime)
           difftime = difftime % 3600
+        elseif headers.status == 404 then
+          difftime = 0
         end
+
       end
     
-      if (tonumber(wpid) > 0) and (difftime == 0) then
+      --if (tonumber(wpid) > 0) and (difftime == 0) then
+        -- geplant war Bilder mit falscher Zeitdifferenz nicht zu löschen
+        -- Der Schutz funktioniert: Metadaten werden entfernt und das Foto aus der Collection
+        -- Bei erstellten Panos wird aber die Erstellungszeit geändert! Daher: IMMER löschen!
+      if (tonumber(wpid) > 0) and (difftime == 0) then 
         success = DeleteMedia(publishSettings, wpid)
       end
 
-      if success then
-        catalog:withWriteAccessDo( 'DeleteMetaData', function ()
+      catalog:withWriteAccessDo( 'DeleteMetaData', function ()
           photo:setPropertyForPlugin( _PLUGIN, 'wpid', '' )
           photo:setPropertyForPlugin( _PLUGIN,'upldate', '' )
           photo:setPropertyForPlugin( _PLUGIN,'wpwidth', '')
@@ -901,28 +907,22 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
           photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
           photo:setPropertyForPlugin( _PLUGIN,'post', '')
           photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
-        end )
-        Log('WP-Media deleted: ' ..tostring(wpid) )
-      else
-        photoUnpublish[i][3] = false
-      end
+      end )
+      Log('WP-Media deleted: ' ..tostring(wpid) )
+      
     end
     error_msg = 'fertig'
+    
   end, error_msg )
 
-  LrTasks.sleep(2)
-  Log('AsyncTask done', error_msg) 
+  --LrTasks.sleep( 0.5 * #photoUnpublish)
+  --Log('AsyncTask done', error_msg) 
 
   for k=1,#photoUnpublish do
-    if photoUnpublish[k][3] then
+    if photoUnpublish[k][4] then
       deletedCallback( photoUnpublish[k][2] )
-    else
-      catalog:withWriteAccessDo( 'ResetImage', function () 
-        local publishedPhoto = photoUnpublish[k][4]
-        publishedPhoto:setEditedFlag(false)
-      end )
     end
-   end
+  end
 
 end
 
@@ -932,6 +932,8 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
   Log('WP-Plugin installed: ', publishSettings.wpplugin)
+  --CheckLogin( publishSettings) -- geht nur innerhalb eines Async Task, da http enthalten!
+  --Log('WP-Plugin installed: ', publishSettings.wpplugin)
   	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
