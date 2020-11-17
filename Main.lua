@@ -165,12 +165,13 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
             
             -- fehlende LR-Metadaten in den WP Katalog schreiben
-            local success = WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
+            WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
             
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
+            
             rendition:recordPublishedPhotoId( ImageID )
           else
             ImageID = nil
@@ -378,23 +379,24 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
   local wpid = 0
   local restData = {}
   local url = ''
+  local httphead
 
   if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
     return
   end
 
-	local httphead = {
+  local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+
+  -- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
+  if defaultcoll then  
+    url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
+    httphead = {
       {field='Authorization', value=hash},
       {field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
       {field='Content-Type', value='image/jpeg'},
     }
-
-  local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
-
-  if defaultcoll then  
-    url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
   elseif folder ~= '' then
-    --Content-Disposition = attachment; filename=example.jpg
+    --Header-Wert: Content-Disposition = attachment; filename=example.jpg OHNE Anführungszeichen!
     url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/addtofolder/" .. folder
     httphead = {
       {field='Authorization', value=hash},
@@ -402,38 +404,35 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
       {field='Content-Type', value='image/jpeg'},
     }
   else
-    return nil, nil
+    return wpid, restData
   end
 
-    
-	local result, headers = LrHttp.post( url, imgfile, httphead )
+  -- Create the image in Wordpress via REST-API according to the above settings
+  local result, headers = LrHttp.post( url, imgfile, httphead )
 
-	if headers.status == 201 then
+  -- Extract data from the Response to the Create-Request
+	if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
       result = JSON:decode(result)
       wpid = tonumber(result['id'])
       restData = ExtractDataFromREST(result)
-  elseif headers.status == 200 then
+
+  elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/wpcat/v1/addtofolder/"
       result = JSON:decode(result)
       wpid = tonumber(result['id'])
-      Log(wpid)
-      Log(result)
       local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
-      Log(url)
+      Log("Anfrage des neuen Bildes über Standard-REST: ", url)
       local httphead = {
         {field='Authorization', value=hash}        
       }
       local result, headers = LrHttp.get( url, httphead )
-      local w1, w2 =  string.find(result, '{"id"') -- findet das Ergebnis, vorher abschneiden, wg. falscher Berechnung der md5
-      result = string.sub(result,1,w2-1)
       result = JSON:decode(result)
       restData = ExtractDataFromREST(result)
+
   else
       wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
-      Log('AddMedia: ',wpid)
-      Log(result)
-      restData = nil
   end
-  
+
+  Log('Added Media: ',wpid)
   return wpid, restData
 end
 
