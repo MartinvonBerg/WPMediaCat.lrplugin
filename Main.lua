@@ -87,8 +87,9 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local exportSettings = exportContext.propertyTable
   local catalog = LrApplication.activeCatalog()
 	local nPhotos = exportSession:countRenditions()
-  --local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
   local pseudoPublishSettings = exportSettings['< contents >']
+  local folder = exportContext.publishedCollectionInfo.name
+  local defaultcoll = exportContext.publishedCollectionInfo.isDefaultCollection
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
     and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
@@ -150,11 +151,15 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           filename = filename:gsub('dng','jpg')
           filename = filename:gsub('DNG','jpg')
+          filename = filename:gsub('tif','jpg')
+          filename = filename:gsub('TIF','jpg')
+          filename = filename:gsub('psd','jpg')
+          filename = filename:gsub('PSD','jpg')
           Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
           local result = 'none'
-          result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath )
+          result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder )
           
           if type(result) == 'number' then
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
@@ -166,14 +171,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
-
+            rendition:recordPublishedPhotoId( ImageID )
           else
             ImageID = nil
           end
-          Log('Upload created new WPId: ' .. result)
+
+          Log('Upload created new WPId: ' .. result .. ' if empty: not created')
       end
-      
-      rendition:recordPublishedPhotoId( ImageID )
+            
     end
     -- delete temp file. There is a cleanup step that happens later, but this will help manage space in the event of a large upload.
 		LrFileUtils.delete( pathOrMessage )
@@ -335,6 +340,7 @@ end
 -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
 function WriteCustomMetaData( publishSettings, photo, restmetadata )
    -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
+  LrMobdebug.on()
   local i = 1
   local foundph = {}
   foundph[i] =  restmetadata
@@ -352,7 +358,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
   photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
   photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
 
-  if tonumber(foundph[i].post) > 0 then
+  if mytonumber(foundph[i].post) ~= 'nil' then
     photo:setPropertyForPlugin( _PLUGIN,'post', url .. "/?p=" .. tostring(foundph[i].post)) -- 
   else
     photo:setPropertyForPlugin( _PLUGIN,'post', '')
@@ -366,11 +372,12 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
 end
 
 -- Add Media File to WP-Media-Catalog via REST-API
-function AddNewMedia( publishSettings, filename, path ) 
+function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
   local hash = 'Basic ' .. publishSettings['hash']
   local filen = filename
   local wpid = 0
   local restData = {}
+  local url = ''
 
   if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
     return
@@ -383,8 +390,21 @@ function AddNewMedia( publishSettings, filename, path )
     }
 
   local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
-    
-  local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
+
+  if defaultcoll then  
+    url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
+  elseif folder ~= '' then
+    --Content-Disposition = attachment; filename=example.jpg
+    url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/addtofolder/" .. folder
+    httphead = {
+      {field='Authorization', value=hash},
+      {field='Content-Disposition', value='attachment; filename=' .. filen},
+      {field='Content-Type', value='image/jpeg'},
+    }
+  else
+    return nil, nil
+  end
+
     
 	local result, headers = LrHttp.post( url, imgfile, httphead )
 
@@ -392,8 +412,26 @@ function AddNewMedia( publishSettings, filename, path )
       result = JSON:decode(result)
       wpid = tonumber(result['id'])
       restData = ExtractDataFromREST(result)
+  elseif headers.status == 200 then
+      result = JSON:decode(result)
+      wpid = tonumber(result['id'])
+      Log(wpid)
+      Log(result)
+      local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+      Log(url)
+      local httphead = {
+        {field='Authorization', value=hash}        
+      }
+      local result, headers = LrHttp.get( url, httphead )
+      local w1, w2 =  string.find(result, '{"id"') -- findet das Ergebnis, vorher abschneiden, wg. falscher Berechnung der md5
+      result = string.sub(result,1,w2-1)
+      result = JSON:decode(result)
+      restData = ExtractDataFromREST(result)
   else
-    	wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+      wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+      Log('AddMedia: ',wpid)
+      Log(result)
+      restData = nil
   end
   
   return wpid, restData
@@ -417,7 +455,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 
   local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
     
-  local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/wpcat/v1/update/" .. tostring(wpid)
+  local url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/update/" .. tostring(wpid)
     
 	local result, headers = LrHttp.post( url, imgfile, httphead )
 

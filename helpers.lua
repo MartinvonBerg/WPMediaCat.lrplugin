@@ -190,3 +190,11 @@ function decb64(data)
             return string.char(c)
     end))
 end
+
+function mytonumber( value )
+    if type(value) == 'number' then
+        return tonumber( value )
+    else
+        return 'nil'
+    end
+end
