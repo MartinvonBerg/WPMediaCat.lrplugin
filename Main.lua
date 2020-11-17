@@ -34,7 +34,7 @@ require 'helpers'
 exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.hideSections = { 'exportLocation', 'exportVideo', 'fileNaming', 'video' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
+exportServiceProvider.hideSections = { 'exportLocation', 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
 exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
@@ -50,7 +50,7 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "DebugMode", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
-  { key = "wpplugin", default = false},
+  { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'disable' --or 'Go to Foto in WP Catalog'
@@ -58,7 +58,6 @@ exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sam
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
 
--- TODO: Nach dem Neustart sind alle Bilder manchmal in republish, manchmal nicht. Scheinbar nur nach wesentlichen Änderungen im Modul
 function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
 	Log('metadataThatTriggersRepublish aufgerufen')
 	return {
@@ -72,8 +71,7 @@ function exportServiceProvider.metadataThatTriggersRepublish( publishSettings )
     gpsAltitude = true,
 		dateCreated = false,
 		copyright = true,
-    customMetadata = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
-    --['com.adobe.lightroom.export.wp_mediacat2.gallery'] = true, -- TODO: Änderung führt nicht zum Republish in der Sammlung!
+    customMetadata = true, 
   }
 
 end
@@ -90,6 +88,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local pseudoPublishSettings = exportSettings['< contents >']
   local folder = exportContext.publishedCollectionInfo.name
   local defaultcoll = exportContext.publishedCollectionInfo.isDefaultCollection
+  local renderedPhoto = {}
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
     and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
@@ -101,7 +100,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     local success, pathOrMessage = rendition:waitForRender()
     local photo = rendition.photo
     local ImageID, wpid, data
-       
+          
     if success then
       progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
       
@@ -146,14 +145,19 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           Log('Rendition-Datei: ' .. renditionFilePath)
           local result = 'none'
           result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
-      
+          renderedPhoto[i] = {}
+          renderedPhoto[i][1] = photo
+          renderedPhoto[i][2] = ImageID -- remoteID
+          renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
+          rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
+          
       else -- add new image to WP Media Catalog
           local filename = LrPathUtils.leafName( pathOrMessage ) --liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
           local result = 'none'
-          result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder )
+          result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder ) -- Einschränkungen siehe dort!
           
           if type(result) == 'number' then
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
@@ -163,8 +167,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
-            rendition:recordPublishedPhotoId( ImageID )
 
+            rendition:recordPublishedPhotoId( ImageID )
+            rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
+            renderedPhoto[i] = {}
+            renderedPhoto[i][1] = photo   -- catalog photo
+            renderedPhoto[i][2] = ImageID -- remoteID
+            renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
+            
           else
             LrDialogs.showError( result)
             ImageID = 'nil'
@@ -180,6 +190,27 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   end
 
   progressScope:done()
+  -- Set the edited flag as sometimes it es reset by the pscope. Don't know why
+  local publishedCollection = LrApplication.activeCatalog():getPublishedCollectionByLocalIdentifier(tonumber(renderedPhoto[1][3])) -- Es wird immer nur aus einer Collection aktualisert
+  local publishedPhotos = publishedCollection:getPublishedPhotos()
+  local sub = {}
+  for m=1, #renderedPhoto do
+    sub[m] = renderedPhoto[m][2]
+  end
+  local arraytostring = inspect(sub)
+
+  for _, pp in pairs(publishedPhotos) do
+    local remoteId = pp:getRemoteId()
+    local ii,j = string.find(arraytostring, remoteId) -- den vollen Filename suchen
+
+    if ii ~= nil then
+      Log('set edit flag: ', remoteId)
+      catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
+        pp:setEditedFlag(false)
+      end)
+    end
+
+  end
 
 end
 
@@ -367,6 +398,13 @@ end
 
 -- Add Media File to WP-Media-Catalog via REST-API
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
+  -- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
+  -- Auch mit FTP wird nicht mehr hochgeladen. NIE!
+  -- Nur dann, KANN es keine Dateien geben, die zwar im Folder sind aber noch nicht in WP sind oder LR nicht zugeordnet wurden, d.h. WP und LR sind dann immer synchron.
+  -- Wenn das geünscht wird, muss im WP-Plugin die Funktion bei der Route 'addtofolder' erweitert werden
+  -- Bei GET: Liefert alle WPIDs zu allen Original-Files im Folder. Zusätzlich werden alle Dateien, die nicht in WP sind gelistet als eigener Key in der REST-Antwort
+  -- Bei POST mit addtofolder, wird mit dem JPG-Body das WP-Bild mit WPID entweder updated oder ohne WPID die bestehende JPG-Datei überschrieben und dann zu WP ergänzt
+  -- In beiden Fällen bei POST wird die WPID als ID zurückgeliefert und der Ablauf in LR-LUA in dieser Funktion kann gleichbleiben! 
   LrMobdebug.on()
   local hash = 'Basic ' .. publishSettings['hash']
   local filen = filename
@@ -860,7 +898,7 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
   
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
-  local galleryId = collection:getRemoteId()
+  --local galleryId = collection:getRemoteId()
   local publishedPhotos = collection:getPublishedPhotos()
   
   for _, pp in pairs(publishedPhotos) do
@@ -960,16 +998,14 @@ end
 
 -- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
-  LrMobdebug.on()
+  --LrMobdebug.on()
   --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
   Log('WP-Plugin installed: ', publishSettings.wpplugin)
-  --CheckLogin( publishSettings) -- geht nur innerhalb eines Async Task, da http enthalten!
-  --Log('WP-Plugin installed: ', publishSettings.wpplugin)
-  	
+    	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
-		defaultCollectionCanBeDeleted = true,
+		defaultCollectionCanBeDeleted = false,
 		canAddCollection = true,
 		maxCollectionSetDepth = 0,
 	}
