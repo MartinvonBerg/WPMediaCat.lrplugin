@@ -148,13 +148,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
       
       else -- add new image to WP Media Catalog
-          local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
-          filename = filename:gsub('dng','jpg')
-          filename = filename:gsub('DNG','jpg')
-          filename = filename:gsub('tif','jpg')
-          filename = filename:gsub('TIF','jpg')
-          filename = filename:gsub('psd','jpg')
-          filename = filename:gsub('PSD','jpg')
+          local filename = LrPathUtils.leafName( pathOrMessage ) --liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
@@ -163,21 +157,20 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           
           if type(result) == 'number' then
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
-            
             -- fehlende LR-Metadaten in den WP Katalog schreiben
             WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
-            
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
             end )
-            
             rendition:recordPublishedPhotoId( ImageID )
+
           else
-            ImageID = nil
+            LrDialogs.showError( result)
+            ImageID = 'nil'
           end
 
-          Log('Upload created new WPId: ' .. result .. ' if empty: not created')
+          Log('Upload created new WPId: ' .. ImageID .. ' if empty: not created')
       end
             
     end
@@ -374,6 +367,7 @@ end
 
 -- Add Media File to WP-Media-Catalog via REST-API
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
+  LrMobdebug.on()
   local hash = 'Basic ' .. publishSettings['hash']
   local filen = filename
   local wpid = 0
@@ -382,7 +376,8 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
   local httphead
 
   if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
-    return
+    wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+    return wpid, restData
   end
 
   local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
@@ -404,20 +399,20 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
       {field='Content-Type', value='image/jpeg'},
     }
   else
+    wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
     return wpid, restData
   end
 
   -- Create the image in Wordpress via REST-API according to the above settings
   local result, headers = LrHttp.post( url, imgfile, httphead )
+  result = JSON:decode(result)
 
   -- Extract data from the Response to the Create-Request
 	if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
-      result = JSON:decode(result)
       wpid = tonumber(result['id'])
       restData = ExtractDataFromREST(result)
 
   elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/wpcat/v1/addtofolder/"
-      result = JSON:decode(result)
       wpid = tonumber(result['id'])
       local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
       Log("Anfrage des neuen Bildes über Standard-REST: ", url)
@@ -429,10 +424,10 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
       restData = ExtractDataFromREST(result)
 
   else
-      wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+      wpid = 'Upload: Fault during upload to WP: ' .. filen .. '.\nHeader-Status: ' .. tostring(headers.status) .. '\nMessage: ' .. result['message']
   end
 
-  Log('Added Media: ',wpid)
+  Log('Added Media: ', wpid)
   return wpid, restData
 end
 
