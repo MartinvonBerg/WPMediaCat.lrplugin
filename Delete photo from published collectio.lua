@@ -114,3 +114,32 @@ exportServiceProvider.deletePhotosFromPublishedCollection = function(publishSett
      end
   
   end
+
+  string.gsub(test,sub,'')
+
+  [[
+-- wird nach dem Aufrufen einer neuen Collection aufgerufen
+function exportServiceProvider.validatePublishedCollectionName( proposedName )
+  Log('validatePublishedCollectionName aufgerufen')
+   -- sanitize Collection: alle Sonderzeichen in '-', alle slashes in '/', slashes am Anfang und Ende löschen
+  -- lrcatactive = string.gsub( lrcatactive,"\\","/")
+  -- WP-StandardFolder nicht erlauben --> rename to 
+  --cat withWriteAccessDo
+  --local collection = info.publishedCollection
+  --collection.setName( 'Das geht nicht' )
+  --end)
+  local first = string.sub(proposedName,1,1)
+  local last = string.sub(proposedName, #proposedName, #proposedName)
+  local wpcatsub = string.match(proposedName, '%d%d%d%d/%d%d')
+  local rest = string.gsub(proposedName,wpcatsub,'')
+
+  if first == '/' or first == '\\' or last == '/' or last == '\\'  then
+    return false, 'No limiting slashes allowed'
+  elseif rest == '' then
+    return false, 'Dont use WP Standard-Folder-Name'
+  else 
+    return true
+  end
+
+end
+--]]

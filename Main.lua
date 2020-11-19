@@ -1012,4 +1012,45 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
 	
 end
 
+-- Funktion zum Löschen einer ganzen Collection / Folder / Gallerie. Nur für Zusätzliche, nicht der Standard-Folder
+-- löscht nur die Fotos im Folder, nicht den Folder im Upload-Verzeichnis
+function exportServiceProvider.deletePublishedCollection( publishSettings, info )
+  LrMobdebug.on() 
+  local catalog = LrApplication.activeCatalog()
+  local publishedCollection = info.publishedCollection
+  local name = info.name
+  local publishedPhotos = publishedCollection:getPublishedPhotos()
+
+  local hash = 'Basic ' .. publishSettings.hash
+  local httphead = {
+    {field='Authorization', value=hash},
+  }
+
+  for _, pp in pairs(publishedPhotos) do
+    local remoteId = pp:getRemoteId()
+    local wpid = string.match(remoteId, '%d+') -- Rückgabe als string
+    local photo = pp:getPhoto()
+    
+    if wpid == nil or wpid =='' then wpid = 0 end
+    Log('wpid to delete: ', wpid)
+    
+    if (tonumber(wpid) > 0) then 
+      DeleteMedia(publishSettings, wpid)
+    end
+
+    catalog:withWriteAccessDo( 'DeleteCollection', function ()
+        photo:setPropertyForPlugin( _PLUGIN, 'wpid', '' )
+        photo:setPropertyForPlugin( _PLUGIN,'upldate', '' )
+        photo:setPropertyForPlugin( _PLUGIN,'wpwidth', '')
+        photo:setPropertyForPlugin( _PLUGIN,'wpheight', '')
+        photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', '')
+        photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
+        photo:setPropertyForPlugin( _PLUGIN,'post', '')
+        photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+    end )
+    Log('WP-Media deleted: ' ..tostring(wpid) )
+    
+  end
+end
+
 return exportServiceProvider
