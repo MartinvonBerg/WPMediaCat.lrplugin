@@ -19,6 +19,7 @@ local LrHttp = import( 'LrHttp' )
 
 -- Check Login given in PublishSettings
 function CheckLogin( publishSettings ) 
+
 	Log('Debug: ' .. tostring(logDebug))
 	LrMobdebug.on()
 	local ReturnTable = {} 
@@ -101,4 +102,4 @@ function CheckLogin( publishSettings )
 	end
   
   return ReturnTable, nil
- end
+end
