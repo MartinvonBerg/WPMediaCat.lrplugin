@@ -95,6 +95,15 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck", -- laut LR SDK Handbuch wird dieser Titel bei Publish nicht angezeigt
   }
 
+  local ok, message = checkfolder( folder )
+  
+  if ok == false then
+    Log(message)
+    LrDialogs.message ('Wrong Collection Name: ' .. folder, 'Reason: ' .. message ..'.\nPlease delete the Collection and create a new one with correct Name containing only a-z, A-Z, 0-9, / - and _ . The Collection must not be named like 2020/11 and must not start or end with slashes.','warning')
+    progressScope:done()
+    return 
+  end
+
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     
     local success, pathOrMessage = rendition:waitForRender()
@@ -114,6 +123,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       }
      
       if tonumber(wpid) > 0 then -- replace image or change state to published after first sync 
+          if progressScope:isCanceled() then progressScope:cancel() end 
           -- TODO: stimmt nur für first sync! replace jpg-image-file oder update geht noch  nicht!
           Log('WPId :' .. wpid .. ' found in Meta. Now updating')
           -- Abfrage: replace nur Metadaten oder das komplette Bild?
@@ -152,6 +162,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
           
       else -- add new image to WP Media Catalog
+          if progressScope:isCanceled() then progressScope:cancel() end 
           local filename = LrPathUtils.leafName( pathOrMessage ) --liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           Log('Adding File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
@@ -1051,6 +1062,25 @@ function exportServiceProvider.deletePublishedCollection( publishSettings, info 
     Log('WP-Media deleted: ' ..tostring(wpid) )
     
   end
+end
+
+function exportServiceProvider.endDialogForCollectionSettings( publishSettings, info )
+  LrMobdebug.on() 
+  local folder = info.name 
+  local collection = info.publishedCollection
+  local ok = false 
+  local message = 'Problem'
+  
+  ok, message = checkfolder( folder )
+  Log(folder)
+  Log(ok)
+  Log(message)
+  
+  if ok == false then
+    LrDialogs.message ('Wrong Collection Name: ' .. folder, 'Reason: ' .. message ..'.\nPlease delete the Collection and create a new one with correct Name containing only a-z, A-Z, 0-9, / - and _ . The Collection must not be named like 2020/11 and must not start or end with slashes.','warning')
+    collection.delete()
+  end
+
 end
 
 return exportServiceProvider

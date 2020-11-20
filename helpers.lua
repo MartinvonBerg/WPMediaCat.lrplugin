@@ -1,7 +1,12 @@
 ----- Debug -----------
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
---require "strict.lua"
+--logDebug = false
+require 'strict'
+require 'Logger'
+local DebugSync = logDebug
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
+local inspect = require 'inspect'
+----- Debug -----------
 
 local LrDate = import( 'LrDate' )
 
@@ -198,3 +203,39 @@ function mytonumber( value )
         return 'nil'
     end
 end
+
+-- wird nach dem Aufrufen einer neuen Collection aufgerufen
+function checkfolder( proposedName )
+    LrMobdebug.on()
+    -- sanitize Collection: alle Sonderzeichen in '-', alle slashes in '/', slashes am Anfang und Ende löschen
+    -- WP-StandardFolder nicht erlauben 
+    -- WP erlaubt das: [a-zA-Z0-9\\/\\-_]*
+    local first = string.sub(proposedName,1,1)
+    local last = string.sub(proposedName, #proposedName, #proposedName)
+    local wpcatsub = string.match(proposedName, '%d%d%d%d/%d%d')
+    if wpcatsub ~= nil then
+        proposedName = string.gsub(proposedName,wpcatsub,'')
+    end
+
+    local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/'
+    
+    local count = 0
+    for i=1, #proposedName do
+        local letter = string.sub(proposedName,i,i)
+        local k,l = string.find(b,letter)
+        if k == l and mytonumber(k) ~= 'nil' then 
+            count = count + 1 
+        end
+    end
+
+    if count ~= #proposedName then
+        return false, 'Dont use other characters than a-z, A-Z, 0-9, / - _'
+    elseif first == '/' or first == '\\' or last == '/' or last == '\\'  then
+      return false, 'No limiting slashes allowed'
+    elseif proposedName == '' then
+      return false, 'Dont use WP Standard-Folder-Name'
+    else 
+      return true
+    end
+  
+  end
