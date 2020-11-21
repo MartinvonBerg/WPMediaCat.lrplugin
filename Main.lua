@@ -32,7 +32,6 @@ local inspect = require 'inspect'
 JSON=require 'JSON'
 require 'Dialogs'
 require 'helpers'
-require 'Post'
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
@@ -73,6 +72,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 	local nPhotos = exportSession:countRenditions()
   local pseudoPublishSettings = exportSettings['< contents >']
   local folder = exportContext.publishedCollectionInfo.name
+  local parents = exportContext.publishedCollectionInfo.parents
   local defaultcoll = exportContext.publishedCollectionInfo.isDefaultCollection
   local renderedPhoto = {}
   local progressScope = exportContext:configureProgress {
@@ -80,6 +80,12 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
     or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck", -- laut LR SDK Handbuch wird dieser Titel bei Publish nicht angezeigt
   }
+  
+  -- Create nested folder name from parents of collection sets
+  for i=#parents,1,-1 do
+    local par = parents[i].name
+    folder = par .. '/' .. folder
+  end
   
   -- Check Gallery-Name again
   local ok, message = checkfolder( folder )
@@ -109,7 +115,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         keywords = photo:getFormattedMetadata('keywordTagsForExport'), -- return keys as table
         credit = photo:getFormattedMetadata( 'artist' ),
         copyright = photo:getFormattedMetadata( 'copyright' ),
-        sortorder = i,
+        --sortorder = i,
       }
       
      
@@ -122,21 +128,22 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           data = GetMedia(pseudoPublishSettings, wpid) 
           data = ExtractDataFromREST(data)
 
-          -- get Filenames and MD5-values
+          -- get Filenames, dimensions and size
           local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
-          Log('Updating File: ' .. filename .. ' to WP')
           local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
+          local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
+         
+          Log('Updating File: ' .. filename .. ' to WP')
           Log('Rendition-Datei: ' .. renditionFilePath)
-          local rendFileContent = LrFileUtils.readFile( renditionFilePath )
-          local MD5rend = LrMD5.digest( rendFileContent )
-          MD5rend = string.upper( MD5rend )
           Log('Folder = Gallery: ' .. folder .. ' : ' .. data.gallery)
+          Log('Size: ' .. data.MD5.size .. ' : ' .. rendFileSize)
 
           if ((folder == data.gallery) or (folder == WPCatColl and data.gallery == '')) then
                        
-            if data.MD5 == MD5rend then
+            if mytonumber(data.MD5.size) == rendFileSize then
               -- update keywords only (tritt vermutlich nie ein, da bei LR die rendition immer eine andere MD5-Summe hat)
+              Log('    Files identical')
               result = 'none'
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else
@@ -146,13 +153,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             end
           
             -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
-            if data['title'] == photoMeta['title'] and  (data['caption'] == photoMeta['title']) then 
+            if data['title'] == photoMeta['title'] and (data['caption'] == photoMeta['title']) then -- title und caption = title
               photoMeta['title'] = '' 
-            end -- title und caption = title
+            end 
 
             if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
-              photoMeta['caption'] = '' 
-            photoMeta['caption'] = '' 
               photoMeta['caption'] = '' 
             end
 
@@ -170,7 +175,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             catalog:withWriteAccessDo( 'UpdateDimension', function ()
               photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
               photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
-              photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
+              --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
             end )
 
             renderedPhoto[i] = {}
@@ -201,6 +206,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
+              --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
             end )
 
             rendition:recordPublishedPhotoId( ImageID )
@@ -222,7 +228,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     -- delete temp file. There is a cleanup step that happens later, but this will help manage space in the event of a large upload.
 		LrFileUtils.delete( pathOrMessage )
     
-  end
+  end -- for rendition
 
   progressScope:done()
 
@@ -248,6 +254,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
   end
 
+end
+
+function exportServiceProvider.reparentPublishedCollection( publishSettings, info )
+  Log('reparentPublishedCollection aufgerufen')
+  error( '\nWarning: Function to move Collections not provided.\nPlugin works correctly. Don\'t worry.\nHowto:\n -Create New Collection and move photos manually. \n -Delete the collection you wanted to move then publish the new collection' )
 end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
@@ -594,6 +605,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
           photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
           photo:setPropertyForPlugin( _PLUGIN,'post', '')
           photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+          photo:setPropertyForPlugin( _PLUGIN,'order', '' )
       end )
       Log('WP-Media deleted: ' ..tostring(wpid) )
       
@@ -624,7 +636,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
 		defaultCollectionCanBeDeleted = false,
 		canAddCollection = true,
-		maxCollectionSetDepth = 0,
+		maxCollectionSetDepth = 4,
 	}
 	
 end
@@ -664,6 +676,7 @@ function exportServiceProvider.deletePublishedCollection( publishSettings, info 
         photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
         photo:setPropertyForPlugin( _PLUGIN,'post', '')
         photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+        photo:setPropertyForPlugin( _PLUGIN,'order', '' )
     end )
     Log('WP-Media deleted: ' ..tostring(wpid) )
     
@@ -677,7 +690,7 @@ function exportServiceProvider.endDialogForCollectionSettings( publishSettings, 
   local collection = info.publishedCollection
   local ok = false 
   local message = 'Problem'
-  
+    
   ok, message = checkfolder( folder )
   Log(folder)
   Log(ok)
@@ -685,6 +698,26 @@ function exportServiceProvider.endDialogForCollectionSettings( publishSettings, 
   
   if ok == false then
     LrDialogs.message ('Wrong Collection Name: ' .. folder, 'Reason: ' .. message ..'.\nPlease delete the Collection and create a new one with correct Name containing only a-z, A-Z, 0-9, / - and _ . The Collection must not be named like 2020/11 and must not start or end with slashes.','warning')
+    collection.delete() -- Das ergibt einen Fehler, dann bricht LR ab und die Gallerie wird nicht erstellt
+  end
+
+end
+
+-- prüft den gerade erstellten Collection-Set-Name und löscht diesen falls falsch
+function exportServiceProvider.endDialogForCollectionSetSettings( publishSettings, info )
+  LrMobdebug.on() 
+  local folder = info.name 
+  local collection = info.publishedCollectionSet
+  local ok = false 
+  local message = 'Problem'
+  
+  ok, message = checkfolder( folder )
+  Log(folder)
+  Log(ok)
+  Log(message)
+  
+  if ok == false then
+    LrDialogs.message ('Wrong Collection-Set Name: ' .. folder, 'Reason: ' .. message ..'.\nPlease delete the Collection-Set and create a new one with correct Name containing only a-z, A-Z, 0-9, / - and _ . The Collection Set must not be named like 2020/11 and must not start or end with slashes.','warning')
     collection.delete() -- Das ergibt einen Fehler, dann bricht LR ab und die Gallerie wird nicht erstellt
   end
 

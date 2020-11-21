@@ -232,7 +232,7 @@ function checkfolder( proposedName )
         return false, 'Dont use other characters than a-z, A-Z, 0-9, / - _'
     elseif first == '/' or first == '\\' or last == '/' or last == '\\'  then
       return false, 'No limiting slashes allowed'
-    elseif proposedName == '' then
+    elseif proposedName == '' or wpcatsub ~=nil then
       return false, 'Dont use WP Standard-Folder-Name'
     else 
       return true
