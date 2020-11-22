@@ -63,6 +63,12 @@ exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sam
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
 
+function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
+   Log('impose Sort aufgerufen')
+   local str = inspect(remoteIdSequence)
+   Log('Sequence: ', str)
+end
+
 -- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. 
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
@@ -164,7 +170,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
           photo:setPropertyForPlugin( _PLUGIN,'post', '')
           photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
-          photo:setPropertyForPlugin( _PLUGIN,'order', '' )
+          --photo:setPropertyForPlugin( _PLUGIN,'order', '' )
         end )
       end
      
@@ -689,7 +695,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
           photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
           photo:setPropertyForPlugin( _PLUGIN,'post', '')
           photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
-          photo:setPropertyForPlugin( _PLUGIN,'order', '' )
+          --photo:setPropertyForPlugin( _PLUGIN,'order', '' )
       end )
       Log('WP-Media deleted: ' ..tostring(wpid) )
       
@@ -760,7 +766,7 @@ function exportServiceProvider.deletePublishedCollection( publishSettings, info 
         photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
         photo:setPropertyForPlugin( _PLUGIN,'post', '')
         photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
-        photo:setPropertyForPlugin( _PLUGIN,'order', '' )
+        --photo:setPropertyForPlugin( _PLUGIN,'order', '' )
     end )
     Log('WP-Media deleted: ' ..tostring(wpid) )
     
