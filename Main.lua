@@ -12,6 +12,8 @@ local LrExportSession = import 'LrExportSession'
 local LrShell = import 'LrShell'
 local LrMD5 = import 'LrMD5'
 local LrPhotoInfo = import 'LrPhotoInfo'
+local LrSelection = import 'LrSelection'
+local LrSystemInfo = import 'LrSystemInfo'
 
 
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
@@ -56,7 +58,7 @@ exportServiceProvider.exportPresetFields = {
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
-exportServiceProvider.titleForGoToPublishedPhoto = 'disable' --or 'Go to Foto in WP Catalog'
+exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
 exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
@@ -75,6 +77,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local parents = exportContext.publishedCollectionInfo.parents
   local defaultcoll = exportContext.publishedCollectionInfo.isDefaultCollection
   local renderedPhoto = {}
+  local notuploaded = {}
+  local countnotuploaded = 0
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
     and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
@@ -87,7 +91,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     folder = par .. '/' .. folder
   end
   
-  -- Check Gallery-Name again
+  -- Check Gallery-Name again, skip render if wrong name
   local ok, message = checkfolder( folder )
   if ok == false then
     Log(message)
@@ -117,85 +121,109 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         copyright = photo:getFormattedMetadata( 'copyright' ),
         --sortorder = i,
       }
+
+      -- get REST-Meta-Data
+      data = GetMedia(pseudoPublishSettings, wpid)  -- data = nil if wpid invalid or = 0
+      data = ExtractDataFromREST(data)              -- data = {} if data-in = nil
       
+      -- get Filenames, dimensions and size
+      local filename = LrPathUtils.leafName( pathOrMessage ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
+      local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
+      local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
+      local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
+      local validPhoto = data.filen == filename
+
+      --[[
+      if validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
+        -- create virtual copy
+        wpid = 0
+        
+        --catalog:setSelectedPhotos( photo )
+        LrSelection.selectAll()
+        local selphoto = catalog:getTargetPhoto()
+        local newphoto = catalog:createVirtualCopies( )
+        local publishedCollection = LrApplication.activeCatalog():getPublishedCollectionByLocalIdentifier( exportContext.publishedCollection.localIdentifier )
+        
+        local a = 1
+        
+        catalog:withWriteAccessDo( 'RemovePhotofromCollection', function ()
+          publishedCollection:removePhotos( photo ) -- woher die collection nehmen
+        end)
+        photo = newphoto
+      end
+      ]]
+      if not validPhoto then
+        wpid = 0
+        photoMeta['gallery'] = ''
+        catalog:withWriteAccessDo( 'DeleteCollection', function ()
+          photo:setPropertyForPlugin( _PLUGIN, 'wpid', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'upldate', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'wpwidth', '')
+          photo:setPropertyForPlugin( _PLUGIN,'wpheight', '')
+          photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', '')
+          photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
+          photo:setPropertyForPlugin( _PLUGIN,'post', '')
+          photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+          photo:setPropertyForPlugin( _PLUGIN,'order', '' )
+        end )
+      end
      
-      if tonumber(wpid) > 0 then -- update image or create virtual copy if existing  
+      if tonumber(wpid) > 0 and validPhoto and ((folder == data.gallery) or (folder == WPCatColl and data.gallery == '')) then -- update image or create virtual copy if existing  
           if progressScope:isCanceled() then progressScope:cancel() end 
           Log('-----------------------------------------------------------')
           Log('WPId :' .. wpid .. ' found in Meta. Now updating')
-       
-          -- get REST-Meta-Data
-          data = GetMedia(pseudoPublishSettings, wpid) 
-          data = ExtractDataFromREST(data)
-
-          -- get Filenames, dimensions and size
-          local filename = photo:getFormattedMetadata( 'fileName' ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
-          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
-          local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
-          local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
-         
           Log('Updating File: ' .. filename .. ' to WP')
           Log('Rendition-Datei: ' .. renditionFilePath)
           Log('Folder = Gallery: ' .. folder .. ' : ' .. data.gallery)
           Log('Size: ' .. data.MD5.size .. ' : ' .. rendFileSize)
-
-          if ((folder == data.gallery) or (folder == WPCatColl and data.gallery == '')) then
-                       
-            if mytonumber(data.MD5.size) == rendFileSize then
-              -- update keywords only (tritt vermutlich nie ein, da bei LR die rendition immer eine andere MD5-Summe hat)
-              Log('    Files identical')
-              result = 'none'
-              result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
-            else
-              -- update photo including keywords
-              result = 'none'
-              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
-            end
-          
-            -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
-            if data['title'] == photoMeta['title'] and (data['caption'] == photoMeta['title']) then -- title und caption = title
-              photoMeta['title'] = '' 
-            end 
-
-            if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
-              photoMeta['caption'] = '' 
-            end
-
-            if data['gallery'] == photoMeta['gallery'] then photoMeta['gallery'] = '' end
-          
-
-            local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
-            if success then
-              Log('WpId :' .. wpid .. ' REST-Meta was updated')
-              ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
-            else
-              ImageID = ''
-            end
-            
-            catalog:withWriteAccessDo( 'UpdateDimension', function ()
-              photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
-              photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
-              --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
-            end )
-
-            renderedPhoto[i] = {}
-            renderedPhoto[i][1] = photo
-            renderedPhoto[i][2] = ImageID -- remoteID
-            renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
-            rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
-            
+                  
+          if mytonumber(data.MD5.size) == rendFileSize then
+            -- update keywords only (tritt vermutlich nie ein, da bei LR die rendition immer eine andere MD5-Summe hat)
+            Log('    Files identical')
+            result = 'none'
+            result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
           else
-            -- create virtual copy if correct image   
+            -- update photo including keywords
+            result = 'none'
+            result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+          end
+        
+          -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
+          if data['title'] == photoMeta['title'] and (data['caption'] == photoMeta['title']) then -- title und caption = title
+            photoMeta['title'] = '' 
+          end 
+
+          if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
+            photoMeta['caption'] = '' 
           end
 
-         
+          if data['gallery'] == photoMeta['gallery'] then photoMeta['gallery'] = '' end
+        
+          local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
+          if success then
+            Log('WpId :' .. wpid .. ' REST-Meta was updated')
+            ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
+          else
+            ImageID = ''
+          end
           
-      else -- add new image to WP Media Catalog
+          catalog:withWriteAccessDo( 'UpdateDimension', function ()
+            photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
+            photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
+            --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
+          end )
+
+          renderedPhoto[i] = {}
+          renderedPhoto[i][1] = photo
+          renderedPhoto[i][2] = ImageID -- remoteID
+          renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
+          rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
+              
+      elseif tonumber(wpid) == 0 then -- add new image to WP Media Catalog
           if progressScope:isCanceled() then progressScope:cancel() end 
-          local filename = LrPathUtils.leafName( pathOrMessage ) --liefert auch den Dateinamen, hier aber filename für WP-Mediacat
           Log(i ..' Adding File: ' .. filename .. ' to WP')
-          local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
           Log('Rendition-Datei: ' .. renditionFilePath)
+          
           local result = 'none'
           result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder ) -- Einschränkungen siehe dort!
           
@@ -222,6 +250,10 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           end
 
           Log('Upload created new WPId: ' .. ImageID .. ' if empty: not created')
+      elseif validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
+          -- do nothing skip
+          countnotuploaded = countnotuploaded + 1
+          notuploaded[countnotuploaded] = filename
       end
             
     end
@@ -232,9 +264,17 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
   progressScope:done()
 
+  if #notuploaded > 0 then
+    LrDialogs.message('Could not upload images!', 'Some images were already uploaded to other collections. \nProposal: Remove from this collection.', 'warning')
+  end
+
   -- Set the edited flag as sometimes it es reset by the pscope. Don't know why
-  local publishedCollection = LrApplication.activeCatalog():getPublishedCollectionByLocalIdentifier(tonumber(renderedPhoto[1][3])) -- Es wird immer nur aus einer Collection aktualisert
-  local publishedPhotos = publishedCollection:getPublishedPhotos()
+  local publishedPhotos = {}
+  if #renderedPhoto > 0 then
+    local publishedCollection = LrApplication.activeCatalog():getPublishedCollectionByLocalIdentifier(tonumber(renderedPhoto[1][3])) -- Es wird immer nur aus einer Collection aktualisert
+    publishedPhotos = publishedCollection:getPublishedPhotos()
+  end
+
   local sub = {}
   for m=1, #renderedPhoto do
     sub[m] = renderedPhoto[m][2]
@@ -511,6 +551,50 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   
   end -- if firtsync
 end -- function
+
+function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
+  local photo = info.photo
+  local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
+  local alt = photo:getFormattedMetadata( 'caption' )
+  local message = 'Code for this Photo to add to a Wordpress-Blog:'
+  local message2 = 'Copy and add to your blog ' .. wpid
+  local folder = info.publishedCollectionInfo.name 
+  local parents = info.publishedCollectionInfo.parents
+  local srcurl = '' -- https://www.mvb1.de/smrtzl/uploads/2020/10/Bike-Hike-Lago-Ischiator-35-scaled.jpg
+
+  -- get REST-Meta-Data
+  local data = GetMedia(publishSettings, wpid)  -- data = nil if wpid invalid or = 0
+  data = ExtractDataFromREST(data)              -- data = {} if data-in = nil
+  srcurl = data.phurl
+
+  local os = LrSystemInfo.osVersion()
+  local ii,j = string.find(os,'indows') -- den vollen Filename suchen
+  if ii ~= nil then
+    os = 'Windows'
+  end
+  
+  -- Create nested folder name from parents of collection sets
+  for i=#parents,1,-1 do
+    local par = parents[i].name
+    folder = par .. '/' .. folder
+  end
+
+  local wpgall = '[gpxview imgpath="' .. folder .. '" gpxfile=".." alttext="Bildergalerie mit Karte, GPX-Track und Höhenprofil "]'
+ 
+  local wpimage ='<!-- wp:image {"align":"center","id":'.. wpid .. ',"sizeSlug":"full","linkDestination":"none"} --> <div class="wp-block-image"><figure class="aligncenter size-full"><img src="'.. srcurl ..'" alt="'.. alt ..'" class="wp-image-'.. wpid ..'"/><figcaption>' .. alt .. '</figcaption></figure></div><!-- /wp:image -->'
+
+  local wp = wpgall .. '    ' .. wpimage
+
+  local copyCmd = "echo '".. wp .."' | pbcopy" -- MAC
+
+  if os == "Windows" then
+         copyCmd = 'Echo '.. '"'.. wp.. '"' .. ' | clip'
+  end
+
+  LrTasks.execute(copyCmd)
+  --LrDialogs.message(message2, wp, 'info')
+  
+end
 
 ----------------------------- fertig -----------------------------------------------
 -- Delete photo from published collection, delete in WP-Media-Catalog, delete MetaData in LR Catalog
@@ -839,7 +923,11 @@ function ExtractDataFromREST( restdata )
 	local result = {} 
 	result[i] = restdata
 	local row = {}
-	local lrid, fname, n
+  local lrid, fname, n
+  
+  if restdata == nil or restdata == '' or restdata == 'nil' or restdata == {} then
+    return row
+  end
   
 	local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
 	local ii,j = string.find(str,'original_image') -- den vollen Filename suchen
@@ -870,22 +958,23 @@ function ExtractDataFromREST( restdata )
 	local _caption = result[i].caption.rendered
 	_caption = findTextinHTML(_caption)
   
-	row = {lrid = {}, id = result[i].id, 
-					  upldate = result[i].date, 
-					  width = result[i].media_details.width, 
-					  height = result[i].media_details.height, 
-					  slug = result[i].slug, 
-					  post = result[i].post, 
-					  gallery = result[i].gallery, 
-					  phurl = result[i].source_url, 
-					  filen = fname,
-					  datemod = result[i].modified, 
-					  title = result[i].title.rendered,
-					  descr = _descr,  
-					  caption = _caption,
-					  alt  = result[i].alt_text, 
-					  origfile = fname, 
-					  MD5 =  result[i].md5_original_file,
+  row = { lrid = {}, 
+          id = result[i].id, 
+          upldate = result[i].date, 
+          width = result[i].media_details.width, 
+          height = result[i].media_details.height, 
+          slug = result[i].slug, 
+          post = result[i].post, 
+          gallery = result[i].gallery, 
+          phurl = result[i].source_url, 
+          filen = fname,
+          datemod = result[i].modified, 
+          title = result[i].title.rendered,
+          descr = _descr,  
+          caption = _caption,
+          alt  = result[i].alt_text, 
+          origfile = fname, 
+          MD5 =  result[i].md5_original_file, -- table contains MD5 und filesize of fname on server
 		  } 
    
 	return row
@@ -1033,7 +1122,10 @@ end
   
 -- Get all Media Files / one Medie File from WP-Media-Catalog via REST-API. Provide response as JSON
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
+-- param: page : wenn nicht angegeben, dann muss 
+-- param: perpage eine wpid sein!
 function GetMedia( publishSettings, perpage, page ) 
+  LrMobdebug.on()
 	local result = nil
 	if publishSettings == {} or publishSettings == nil then
 	  return result
@@ -1051,22 +1143,26 @@ function GetMedia( publishSettings, perpage, page )
 	if tonumber(perpage) ~= nil and tonumber(page) ~= nil then
 		  url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
 	elseif tonumber(perpage) > 0 and tonumber(page) == nil then
-	  url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
+    url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
+  elseif tonumber(perpage) == 0 then
+    return
 	else  
-		  url = _siteURL .. "/wp-json/wp/v2/media/"
-	  end
+		url = _siteURL .. "/wp-json/wp/v2/media/"
+	end
 	 
-	  local result, headers = LrHttp.get( url, httphead )
+	local result, headers = LrHttp.get( url, httphead )
   
-	  if headers.status == 200 then
-		  result = JSON:decode(result)
-	 end
+	if headers.status == 200 then
+      result = JSON:decode(result)
+  else 
+    result = nil
+	end
 	
 	return result
-  end
+end
   
   -- Delete Media Files from WP-Media-Catalog via REST-API
-  function DeleteMedia( publishSettings, wpmediaid ) 
+function DeleteMedia( publishSettings, wpmediaid ) 
 	local result = false
 	local idcheck = type(tonumber(wpmediaid))
 	if publishSettings == {} or publishSettings.hash == '' or publishSettings.siteURL == '' or idcheck ~= 'number' then
