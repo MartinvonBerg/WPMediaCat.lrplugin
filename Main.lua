@@ -67,6 +67,23 @@ function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSett
    Log('impose Sort aufgerufen')
    local str = inspect(remoteIdSequence)
    Log('Sequence: ', str)
+   local success = false 
+   local wpid
+   local photoMeta = {}
+
+   for i=1, #remoteIdSequence do -- i = Sort order
+    wpid = tonumber(string.match( remoteIdSequence[i] , '%d+')) -- wpid als string
+    Log('ID: ', wpid)
+    photoMeta = {
+      sortorder = i,
+    }
+    success = WritephotoMetaToWp( publishSettings, wpid, photoMeta )
+   end
+
+   if not success then
+    LrDialogs.message('Could not write custom Sort-Order to Wordpress for ID: ' .. wpid ,'','info')
+   end
+
 end
 
 -- publish Photos -- processRenderedPhotos -- hier werden die fotos die in der Sammlung sind verarbeitet. 
@@ -842,7 +859,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
-	  
+	LrMobdebug.on()  
 	local success = false
   
 	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
@@ -887,31 +904,46 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	
 	for k, v in pairs(photoMeta) do
 	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
-		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
-		local str = 'alt_text=' .. v .. '&description=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
-		url = url .. pre(n) .. str
-		n = n + 1
-	  end
+      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+      local str = 'alt_text=' .. v .. '&description=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
+      url = url .. pre(n) .. str
+      n = n + 1
+    end
+    
 	  if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
-		v = urlencode(v)
-		local str = 'gallery=' .. v
-		url = url .. pre(n) .. str
-		n = n + 1
-	  end
+      v = urlencode(v)
+      local str = 'gallery=' .. v
+      url = url .. pre(n) .. str
+      n = n + 1
+    end
+    
 	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
-		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
-		local str = 'title=' .. v .. '&caption=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
-		url = url .. pre(n) .. str
-		n = n + 1
-	  end
+      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+      local str = 'title=' .. v .. '&caption=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
+      url = url .. pre(n) .. str
+      n = n + 1
+    end
+
+    if k == 'sortorder' and v ~= '' and v ~= nil and v ~= 'nil' then -- hier wird nur eine Nummer als integer übergeben
+      v = urlencode( tostring(v))
+      local str = 'gallery_sort=' .. v
+      url = url .. pre(n) .. str
+      n = n + 1
+    end
+    
 	end
   
 	if n>0 then
 	  result, headers = LrHttp.post( url, '', httphead )
-	  if headers.status == 200 then
-		success = true
-		Log('Wrote Meta to Rest: ' .. url)
-	  end
+    
+    if headers.status == 200 then -- der POST-Request wird in diesem Fall immer mit status = 200 beantwortet
+      success = true
+      Log('Wrote Meta to Rest: ' .. url)
+    else
+      success = false
+      Log('Could not write Meta to Rest: ' .. url)
+    end
+
 	else
 	  success = true
 	  Log('No Meta to update: ' .. url)
