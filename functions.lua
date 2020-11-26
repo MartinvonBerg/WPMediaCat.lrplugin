@@ -187,7 +187,8 @@ function ExtractDataFromREST( restdata )
           gallery = result[i].gallery, 
           phurl = result[i].source_url, 
           filen = fname,
-          datemod = result[i].modified, 
+		  datemod = result[i].modified, 
+		  datecreated = result[i].media_details.image_meta.created_timestamp,
           title = result[i].title.rendered,
           descr = _descr,  
           caption = _caption,
@@ -341,9 +342,9 @@ end
   
 -- Get all Media Files / one Medie File from WP-Media-Catalog via REST-API. Provide response as JSON
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
--- param: page : wenn nicht angegeben, dann muss 
--- param: perpage eine wpid sein!
-function GetMedia( publishSettings, perpage, page ) 
+-- param: page : wenn nicht angegeben, dann muss perpage eine wpid sein!
+-- param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
+function GetMedia( publishSettings, perpage, page, fields ) 
   LrMobdebug.on()
 	local result = nil
 	if publishSettings == {} or publishSettings == nil then
@@ -362,9 +363,9 @@ function GetMedia( publishSettings, perpage, page )
 	if tonumber(perpage) ~= nil and tonumber(page) ~= nil then
 		  url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
 	elseif tonumber(perpage) > 0 and tonumber(page) == nil then
-    url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
-  elseif tonumber(perpage) == 0 then
-    return
+    	url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
+  	elseif tonumber(perpage) == 0 then
+    	return
 	else  
 		url = _siteURL .. "/wp-json/wp/v2/media/"
 	end

@@ -17,7 +17,7 @@ local LrSystemInfo = import 'LrSystemInfo'
 
 
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
-local catoutdate = 2 -- in days
+local catoutdate = 2 -- max. allowd age of lrcat-copy in days
 local HDDwritespeed = 100 -- in MBytes / s
 local WPCatColl = 'WPCat'
 
@@ -151,7 +151,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
       -- get REST-Meta-Data
       data = GetMedia(pseudoPublishSettings, wpid)  -- data = nil if wpid invalid or = 0
-      data = ExtractDataFromREST(data)              -- data = {} if data-in = nil
+      data = ExtractDataFromREST(data)              -- data = {} if data-in = nil. Used: filen, gallery, MD5
       
       -- get Filenames, dimensions and size
       local filename = LrPathUtils.leafName( pathOrMessage ) -- LrPathUtils.leafname( pathOrMessage ) liefert auch den Dateinamen, hier aber filename für WP-Mediacat
@@ -159,7 +159,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
       local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
       local validPhoto = data.filen == filename
-      local pubColl = photo:getContainedPublishedCollections()
+      
       
       -- check the manually created virtual copy and reset metadata if ok
       if validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
@@ -170,6 +170,10 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           wpid = 0
           photoMeta['gallery'] = ''
           ResetCustomMeta( photo )
+          local name = 'Copy of ' .. filename
+          catalog:withWriteAccessDo( 'SetCopyName', function ()
+            photo:setRawMetadata( 'copyName', name )
+          end)
         end
       
       end
@@ -322,7 +326,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local catalog = LrApplication.activeCatalog()
-  local nphotos = collection:getPhotos()
+  local nphotos = collection:getPhotos() -- array of LrPhoto
   local firstsync = false
   local result
   local mediatable = {}
@@ -331,6 +335,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local getmore = true
   local runs = 0
 
+  -- Pfad für die Kopie von lrcat definieren
   local p = string.gsub( _PLUGIN.path,"\\","/")
   local lrcatactive = catalog:getPath()
   lrcatactive = string.gsub( lrcatactive,"\\","/") -- check: zu alt, klein, nicht vorhanden
@@ -349,6 +354,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
 
+  -- Katalog kopieren
   if catsuccess == false or catsuccess == 'directory' then
     local button = LrDialogs.confirm ( "Local Copy of active LR-Catalog not found or outdated",'Press OK to copy ' .. lrcatactive .. ' to ' .. lrcat)
     if button == 'cancel' then
@@ -449,7 +455,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       --end
       
       if #filen > 3 then
-      -- suche mit Dateiname aus WP -- TODO: Pfad zum echten und aktiven LR-cat verwenden!
+      -- suche mit Dateiname aus WP 
         success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
         lrid = LrFileUtils.readFile( p ..'/test.txt' )
         if #lrid > 9 then lrid = string.sub(lrid,1,7) end
@@ -509,7 +515,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       else
         lrid = nil
       end
-    
+      
       if lrid ~=nil then
         foundph[nfound] = mediatable[i] 
         searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
