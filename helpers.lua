@@ -240,3 +240,29 @@ function checkfolder( proposedName )
     end
   
   end
+
+  -- array ist einfache Tabelle als liste mit Stringwerten, wie von strsplit gelifert
+  -- Annahme, dass der Wert nur einmal vorhanden ist
+  function findValueInArray (array, key, depth)
+    local result = 0
+    
+    if depth == '' or depth == nil then
+        for i=1, #array do
+            if array[i] == key then
+                result = i
+                break
+            end
+        end
+    end
+
+    if depth ==1 then
+        for i=1, #array do
+            if array[i] == key then
+                result = i
+                break
+            end
+        end
+    end
+
+    return result
+  end

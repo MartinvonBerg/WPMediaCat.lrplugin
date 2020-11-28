@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = logDebug
+local DebugSync = false
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -322,9 +322,10 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  --LrMobdebug.on()
+  LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
+  local pubService = info.publishService
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos() -- array of LrPhoto
   local firstsync = false
@@ -354,7 +355,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
 
-  -- Katalog kopieren
+  -- wenn nicht, dann Katalog kopieren
   if catsuccess == false or catsuccess == 'directory' then
     local button = LrDialogs.confirm ( "Local Copy of active LR-Catalog not found or outdated",'Press OK to copy ' .. lrcatactive .. ' to ' .. lrcat)
     if button == 'cancel' then
@@ -386,7 +387,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end
 
   if DebugSync then
-    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -440,6 +441,9 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local nfound = 1
   local nnotfound = 1
   local searchDesc = {}
+  local paths = {}
+  local npaths = 1
+  local sub
   local pscopeadd = (0.65 - 0.2) / #mediatable
   local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
   Log('Use Cat: ' .. sqcat1)
@@ -453,6 +457,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
       --  local b = '3'
       --end
+      if pscope:isCanceled() then pscope:cancel() end 
+
+      -- Collection und CollectionSet bestimmen
+      local path = mediatable[i].phurl
+      local pathlist = strsplit(path, '/' )
+      local uploadindex = findValueInArray (pathlist, 'uploads')
+      sub =''
+      for c=uploadindex+1, #pathlist-1 do -- hier wird immer nur ein pfad durchsucht
+        sub = sub .. pathlist[c] .. '/'
+      end
       
       if #filen > 3 then
       -- suche mit Dateiname aus WP 
@@ -515,7 +529,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       else
         lrid = nil
       end
-      
+      lrid = nil -- debug
       if lrid ~=nil then
         foundph[nfound] = mediatable[i] 
         searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
@@ -524,8 +538,33 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         notfound[nnotfound] = mediatable[i]
         nnotfound = nnotfound +1
       end
+      if pscope:isCanceled() then pscope:cancel() end
       pscope:setPortionComplete(0.2 + i * pscopeadd)
+
+      if findValueInArray(paths, sub) == 0 then
+        local wpcatsub = string.match(sub, '%d%d%d%d/%d%d')
+        if wpcatsub == nil then
+          paths[npaths] = sub
+          npaths = npaths +1
+        end
+      end
   end
+
+  -- Gefundene Pfade in paths zu collectionSets und Collections verarbeiten
+  local str = inspect(paths)
+  Log(paths)
+  for m=1, #paths-1 do 
+    local collections = strsplit(paths[m], '/' )
+    local coll = collections[1]
+    Log(coll)
+    catalog:withWriteAccessDo( 'CreateFirstLevel', function ()
+      local a = 1
+      local exist = pubService:createPublishedCollectionSet( coll, nil, true )
+      Log( inspect(exist))
+    end)
+  end
+
+  if pscope:isCanceled() then pscope:cancel() end
   pscope:setPortionComplete(0.65)
   
   -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
@@ -534,6 +573,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
   pscope:setPortionComplete(0.8)
+  if pscope:isCanceled() then pscope:cancel() end
   LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
   
   -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
