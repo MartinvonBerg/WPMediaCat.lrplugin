@@ -235,6 +235,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           renderedPhoto[i][1] = photo
           renderedPhoto[i][2] = ImageID -- remoteID
           renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
+          rendition:recordPublishedPhotoId( ImageID )
           rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
               
       elseif tonumber(wpid) == 0 then -- add new image to WP Media Catalog
@@ -616,7 +617,7 @@ end -- function
 -- function called if Right-Click on photo and titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' is selected
 -- creates code for WP and copies it to the clipboard. It is not possible to copy the code out of the message window!
 function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
-  local photo = info.photo
+  local photo = info.photo -- Type LrPhoto
   local wpid = photo:getPropertyForPlugin( mypluginID, 'wpid' )
   local alt = photo:getFormattedMetadata( 'caption' )
   local message = 'Code for this Photo to add to a Wordpress-Blog:'
@@ -653,6 +654,67 @@ function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
 
   LrTasks.execute(copyCmd)
   --LrDialogs.message(message2, wp, 'info')
+
+  -------------- colltest-----------------
+  local pubService = info.publishService
+  local catalog = LrApplication.activeCatalog()
+  local paths = {}
+  local npaths = 1
+  local sub
+  local name = pubService:getName()
+  Log(name)
+  local psid = pubService:getPluginId()
+  Log(psid)
+  local Level1 = {}
+
+  -- Gefundene Pfade in paths zu collectionSets und Collections verarbeiten
+  paths = {"Gallerie/Sync1/","Gallerie/Sync2/","Test1/","Test2/a1/", "Test2/a2/", "Foto_Albums/Franken-Dennenlohe/","Albums/","Foto_Albums/Bike-Hike-Col-de-Peas/","Neu/",""}
+  local str = inspect(paths)
+  Log(paths)
+  for m=1, #paths-1 do 
+    local collections = strsplit(paths[m], '/' )
+    local ncollections = #collections-1
+    -- first Level
+    --local level = 1
+    local collparent = nil
+    Level1[m] = {}
+    local result
+
+    for level=1, ncollections do
+      local coll = collections[level]
+      Log(coll)
+     
+      if level < ncollections then
+        catalog:withWriteAccessDo( 'Create1stLevel', function ()
+          result = pubService:createPublishedCollectionSet( coll, collparent, true) -- Ergebnis kann nicht übergeben werden, führt zu Fehler!
+        end)
+        -- set this to parent -- Fehl Suche in vorhandenen, ob die Coll bereits vorhanden ist
+        collparent = result
+      elseif level == ncollections then
+        catalog:withWriteAccessDo( 'Create1stLevel', function ()
+          result = pubService:createPublishedCollection( coll, collparent, true)
+        end)
+        
+      end
+    end
+
+    Level1[m] = result
+  end
+
+  --[[
+  Log('Adding to Collections')
+  for m=1, #Level1 do
+    local photos = {}
+    photos[1] = photo
+    local coll = Level1[m]
+    Log(coll.type())
+    catalog:withWriteAccessDo( 'AddOnePhoto', function ()
+      Log('writeAccess')
+      coll.addPhotos( photo )
+    end)
+    
+  end  
+  ]]
   
 end
 
