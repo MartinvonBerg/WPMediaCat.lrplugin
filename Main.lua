@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = false
+local DebugSync = true
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -356,7 +356,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
 
-  -- wenn nicht, dann Katalog kopieren
+  -- wenn Katalog nicht aktuell, dann Katalog kopieren
   if catsuccess == false or catsuccess == 'directory' then
     local button = LrDialogs.confirm ( "Local Copy of active LR-Catalog not found or outdated",'Press OK to copy ' .. lrcatactive .. ' to ' .. lrcat)
     if button == 'cancel' then
@@ -387,6 +387,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
 
+  -- Suchlauf bei Debuggin verkürzen
   if DebugSync then
     perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
   else
@@ -405,13 +406,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   
   -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen
   if (firstsync == true and publishSettings.urlreadable == true) then
+    Log('Start First Sync')
     while getmore == true
     do
+      Log('Start While')
       LrFunctionContext.callWithContext( "GetMedia", function( context )    
          result = GetMedia(publishSettings, perpage, runs+1)
       end,
       result)
       len = #result
+      Log('Fetched ' .. len .. ' Photos')
           
       local i = 1
       while result[i] ~= nil
@@ -433,185 +437,208 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       
     end
  
-  LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
-  pscope:setPortionComplete(0.2)
+    LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
+    pscope:setPortionComplete(0.2)
 
-  -- Suche die Fotos im LR-Catalog
-  local foundph = {}
-  local notfound = {}
-  local nfound = 1
-  local nnotfound = 1
-  local searchDesc = {}
-  local paths = {}
-  local npaths = 1
-  local sub
-  local pscopeadd = (0.65 - 0.2) / #mediatable
-  local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
-  Log('Use Cat: ' .. sqcat1)
+    -- Suche die Fotos im LR-Catalog
+    local foundph = {}
+    local notfound = {}
+    local nfound = 1
+    local nnotfound = 1
+    local searchDesc = {}
+    local paths = {}
+    local npaths = 1
+    local sub
+    local Level1 = {}
+    local pscopeadd = (0.65 - 0.2) / #mediatable
+    local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
+    Log('Use Cat: ' .. sqcat1)
 
-  ----------------------------------------------------------
-  -- Suchlauf
-  for i=1,#mediatable do
-      local filen = mediatable[i].filen
-      local success = false
-      local lrid
-      --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
-      --  local b = '3'
-      --end
-      if pscope:isCanceled() then pscope:cancel() end 
+    ----------------------------------------------------------
+    -- Suchlauf
+    for i=1,#mediatable do
+        local filen = mediatable[i].filen
+        local success = false
+        local lrid
+        --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
+        --  local b = '3'
+        --end
+        if pscope:isCanceled() then pscope:cancel() end 
 
-      -- Collection und CollectionSet bestimmen
-      local path = mediatable[i].phurl
-      local pathlist = strsplit(path, '/' )
-      local uploadindex = findValueInArray (pathlist, 'uploads')
-      sub =''
-      for c=uploadindex+1, #pathlist-1 do -- hier wird immer nur ein pfad durchsucht
-        sub = sub .. pathlist[c] .. '/'
-      end
-      
-      if #filen > 3 then
-      -- suche mit Dateiname aus WP 
-        success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
-        lrid = LrFileUtils.readFile( p ..'/test.txt' )
-        if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-        lrid = tonumber(lrid)
-      
-        if lrid == nil then 
-          success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
-          local sqltab = {}
-          sqltab = sqlread( p .. "/test.txt", '|')
-                    
-          if #sqltab == 1 then -- einmal gefunden
-            lrid = sqltab[1][1] 
-            
-          elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
-            local csel = 0
-            local ncol = 0
-            
-            for m=1,#sqltab do
-              local id = tostring(sqltab[m][1] - 1)
-              success = LrTasks.execute( sqcat1 .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
-              local label = LrFileUtils.readFile( p ..'/collabel.txt' )
-              --Wenn CololLabel == 'Rot' dann filen = idx_filename
-              if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
-                csel = m
-                ncol = ncol +1
-              end
-            end -- for
-            
-            if ncol == 1 then
-              lrid = sqltab[csel][1]
-              filen = sqltab[csel][2]
-            end
-          end
-        end -- end if lrid
-        
-        if lrid == nil then
-          local base, ext = SplitFilename(filen)
-          if base ~= nil then
-            success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
-            lrid = LrFileUtils.readFile( p ..'/test.txt' )
-            if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-            lrid = tonumber(lrid)
-            if lrid ~= nil then
-              filen = base
-            end
+        -- Pfade für Collection und CollectionSet bestimmen
+        local path = mediatable[i].phurl
+        local pathlist = strsplit(path, '/' )
+        local uploadindex = findValueInArray (pathlist, 'uploads')
+        sub =''
+        for c=uploadindex+1, #pathlist-1 do -- hier wird immer nur ein pfad durchsucht
+          sub = sub .. pathlist[c] .. '/'
+        end
+        -- Pfad nur ergänzen wenn nicht schon vorhanden und kein WP-Standard-Pfad
+        if findValueInArray(paths, sub) == 0 then
+          local wpcatsub = string.match(sub, '%d%d%d%d/%d%d')
+          if wpcatsub == nil then
+            paths[npaths] = sub
+            npaths = npaths +1
           end
         end
-      
-        if lrid == nil then
-          filen = replhyphen(filen)
-          success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+        -----------------------------------------
+
+        if #filen > 3 then
+        -- suche mit Dateiname aus WP 
+          success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)
+        
+          if lrid == nil then 
+            success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+            local sqltab = {}
+            sqltab = sqlread( p .. "/test.txt", '|')
+                      
+            if #sqltab == 1 then -- einmal gefunden
+              lrid = sqltab[1][1] 
+              
+            elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
+              local csel = 0
+              local ncol = 0
+              
+              for m=1,#sqltab do
+                local id = tostring(sqltab[m][1] - 1)
+                success = LrTasks.execute( sqcat1 .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
+                local label = LrFileUtils.readFile( p ..'/collabel.txt' )
+                --Wenn CololLabel == 'Rot' dann filen = idx_filename
+                if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
+                  csel = m
+                  ncol = ncol +1
+                end
+              end -- for
+              
+              if ncol == 1 then
+                lrid = sqltab[csel][1]
+                filen = sqltab[csel][2]
+              end
+            end
+          end -- end if lrid
+          
+          if lrid == nil then
+            local base, ext = SplitFilename(filen)
+            if base ~= nil then
+              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
+              lrid = LrFileUtils.readFile( p ..'/test.txt' )
+              if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+              lrid = tonumber(lrid)
+              if lrid ~= nil then
+                filen = base
+              end
+            end
+          end
+        
+          if lrid == nil then
+            filen = replhyphen(filen)
+            success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+            lrid = LrFileUtils.readFile( p ..'/test.txt' )
+            if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+            lrid = tonumber(lrid)
+          end
+        --- ende dersuche
+        else
+          lrid = nil
         end
-      --- ende dersuche
-      else
-        lrid = nil
+        --lrid = nil -- debug
+        if lrid ~=nil then
+          foundph[nfound] = mediatable[i] 
+          searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
+          nfound = nfound +1
+        else
+          notfound[nnotfound] = mediatable[i]
+          nnotfound = nnotfound +1
+        end
+        if pscope:isCanceled() then pscope:cancel() end
+        pscope:setPortionComplete(0.2 + i * pscopeadd)
+
+    end
+
+    -- Gefundene Pfade in paths zu collectionSets und Collections verarbeiten
+    local str = inspect(paths)
+    Log(paths)
+    for m=1, #paths do -- Achtung evtl -1
+      local collections = strsplit(paths[m], '/' )
+      local ncollections = #collections-1
+      -- first Level
+      --local level = 1
+      local collparent = nil
+      Level1[m] = {}
+      local result
+
+      for level=1, ncollections do
+        local coll = collections[level]
+        Log(coll)
+      
+        if level < ncollections then
+          catalog:withWriteAccessDo( 'Create1stLevel', function ()
+            result = pubService:createPublishedCollectionSet( coll, collparent, true) -- Ergebnis kann nicht übergeben werden, führt zu Fehler!
+          end)
+          -- set this to parent -- Fehl Suche in vorhandenen, ob die Coll bereits vorhanden ist
+          collparent = result
+        elseif level == ncollections then
+          catalog:withWriteAccessDo( 'Create1stLevel', function ()
+            result = pubService:createPublishedCollection( coll, collparent, true)
+          end )
+          
+        end
       end
-      lrid = nil -- debug
-      if lrid ~=nil then
-        foundph[nfound] = mediatable[i] 
-        searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
-        nfound = nfound +1
-      else
-        notfound[nnotfound] = mediatable[i]
+
+      Level1[m] = result
+    end
+
+    if pscope:isCanceled() then pscope:cancel() end
+    pscope:setPortionComplete(0.65)
+    
+    -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
+    addToWPColl(collection, searchDesc, foundph) 
+    ------------------------------------------------------------------------
+
+    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+    pscope:setPortionComplete(0.8)
+    if pscope:isCanceled() then pscope:cancel() end
+    LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
+    
+    -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
+    catalog:withWriteAccessDo( 'AddMetaData', function () 
+      for i=1, nfound-1 do
+          if i > #foundph then
+            break
+          end
+          local photos = foundph[i].lrid
+                  
+          for j, photo in ipairs(photos) do
+            WriteCustomMetaData( publishSettings, photo, foundph[i])
+          end
+        
+      end 
+    end ) -- catalog:withWriteAccessDo
+    
+    -- Write csv-File with not found Photos
+    for i=1,#foundph do
+      if foundph[i].lrid[1] == nil then
+        table.insert(notfound,foundph[i])
         nnotfound = nnotfound +1
       end
-      if pscope:isCanceled() then pscope:cancel() end
-      pscope:setPortionComplete(0.2 + i * pscopeadd)
-
-      if findValueInArray(paths, sub) == 0 then
-        local wpcatsub = string.match(sub, '%d%d%d%d/%d%d')
-        if wpcatsub == nil then
-          paths[npaths] = sub
-          npaths = npaths +1
-        end
-      end
-  end
-
-  -- Gefundene Pfade in paths zu collectionSets und Collections verarbeiten
-  local str = inspect(paths)
-  Log(paths)
-  for m=1, #paths-1 do 
-    local collections = strsplit(paths[m], '/' )
-    local coll = collections[1]
-    Log(coll)
-    catalog:withWriteAccessDo( 'CreateFirstLevel', function ()
-      local a = 1
-      local exist = pubService:createPublishedCollectionSet( coll, nil, true )
-      Log( inspect(exist))
-    end)
-  end
-
-  if pscope:isCanceled() then pscope:cancel() end
-  pscope:setPortionComplete(0.65)
-  
-  -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
-  addToWPColl(collection, searchDesc, foundph) 
-  ------------------------------------------------------------------------
-
-  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-  pscope:setPortionComplete(0.8)
-  if pscope:isCanceled() then pscope:cancel() end
-  LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
-  
-  -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
-  catalog:withWriteAccessDo( 'AddMetaData', function () 
-    for i=1, nfound-1 do
-        if i > #foundph then
-          break
-        end
-        local photos = foundph[i].lrid
-                
-        for j, photo in ipairs(photos) do
-          WriteCustomMetaData( publishSettings, photo, foundph[i])
-        end
-       
-    end 
-  end ) -- catalog:withWriteAccessDo
-  
-  -- Write csv-File with not found Photos
-  for i=1,#foundph do
-    if foundph[i].lrid[1] == nil then
-      table.insert(notfound,foundph[i])
-      nnotfound = nnotfound +1
     end
-  end
-  local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-  csvwrite(p2 .. '/notfound.csv',notfound, ';') 
-  
-  pscope:done()
-  LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+    local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+    csvwrite(p2 .. '/notfound.csv',notfound, ';') 
+    
+    pscope:done()
+    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
 
-  -- TODO: Download der nicht gefundenen bilder zum Katalog
-  -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.
-  -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
-  -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
-  -- Metadaten wie auch bei den gefundenen Fotos setzen
+    -- TODO: Download der nicht gefundenen bilder zum Katalog
+    -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.
+    -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
+    -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
+    -- Metadaten wie auch bei den gefundenen Fotos setzen
   
   end -- if firtsync
+  pscope:done()
 end -- function
 
 -- function called if Right-Click on photo and titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' is selected

@@ -344,7 +344,7 @@ end
 -- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 -- param: page : wenn nicht angegeben, dann muss perpage eine wpid sein!
 -- param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
-function GetMedia( publishSettings, perpage, page, fields ) 
+function GetMedia( publishSettings, perpage, page ) 
   LrMobdebug.on()
 	local result = nil
 	if publishSettings == {} or publishSettings == nil then
@@ -362,6 +362,7 @@ function GetMedia( publishSettings, perpage, page, fields )
 	 
 	if tonumber(perpage) ~= nil and tonumber(page) ~= nil then
 		  url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
+		  Log(url)
 	elseif tonumber(perpage) > 0 and tonumber(page) == nil then
     	url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
   	elseif tonumber(perpage) == 0 then
@@ -418,7 +419,7 @@ end
 function addToWPColl (collection, search, photos)
 
 	LrTasks.startAsyncTask(function ()
-		--LrMobdebug.on()
+		LrMobdebug.on()
 		local catalog = LrApplication.activeCatalog()
 		local len = #search
 		local selphoto
