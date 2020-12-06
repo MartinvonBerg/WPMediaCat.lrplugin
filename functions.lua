@@ -416,64 +416,85 @@ end
 -- special selection if more then on photo found. Selector: "Rot"
 -- This runs as asynchronous Task! Main Task has to wait. No Signalling between Tasks.
 -- add found photos to WP-LR-Sync-Collection
-function addToWPColl (collection, search, photos)
-
+function addToWPColl (collection, search, photos, all_collections, all_paths)
+	
 	LrTasks.startAsyncTask(function ()
 		LrMobdebug.on()
+		local str =inspect(all_paths)
+		Log('Pahts in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
 		local len = #search
 		local selphoto
 			
 		for i=1,len do
-		local lrid = catalog:findPhotos {
-			searchDesc = {search[i],
-			{ criteria = "copyname", -- selektiert die Kopien aus
-				operation = "noneOf",
-				value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
-			}, 
-			combine = "intersect"} -- UND-Verknüpfung der Kriterien
-		}
+			local lrid = catalog:findPhotos {
+				searchDesc = { 
+					{ criteria = search[i]['criteria'], operation = search[i]['operation'], value = search[i]['value'], } ,
+					{ criteria = "copyname", -- selektiert die Kopien aus
+						operation = "noneOf",
+						value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
+					}, 
+				combine = "intersect"} -- UND-Verknüpfung der Kriterien
+			}
 		
-		--------- Auswahl bei mehr als einem gefundenen Foto
-		if lrid[2] ~= nil then
-			local label = {} 
-			local sel = 0
-			local nred = 0
-			local csel = 0
-			local ncol = 0
-			local coll = {}
-			local pubcoll = {}
-			
-			for k, ph in ipairs(lrid) do
-			label[k] = ph:getFormattedMetadata('label')
-			if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
-				sel = k
-				nred = nred +1
+			--------- Auswahl bei mehr als einem gefundenen Foto
+			if lrid[2] ~= nil then
+				local label = {} 
+				local sel = 0
+				local nred = 0
+				local csel = 0
+				local ncol = 0
+				local coll = {}
+				local pubcoll = {}
+				
+				for k, ph in ipairs(lrid) do
+				label[k] = ph:getFormattedMetadata('label')
+				if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
+					sel = k
+					nred = nred +1
+				end
+				coll[k] = ph:getContainedCollections()
+				pubcoll[k] = ph:getContainedPublishedCollections()
+				if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
+					csel = k
+					ncol = ncol +1
+				end
+				
+				end
+				
+				if nred == 1 then
+				selphoto = {lrid[sel]}
+				lrid = selphoto
+				elseif ncol == 1 then
+				selphoto = {lrid[csel]}
+				lrid = selphoto
+				end
+				
 			end
-			coll[k] = ph:getContainedCollections()
-			pubcoll[k] = ph:getContainedPublishedCollections()
-			if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
-				csel = k
-				ncol = ncol +1
-			end
 			
-			end
-			
-			if nred == 1 then
-			selphoto = {lrid[sel]}
-			lrid = selphoto
-			elseif ncol == 1 then
-			selphoto = {lrid[csel]}
-			lrid = selphoto
-			end
-			
-		end
-		
-		photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+			photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
 
-		catalog:withWriteAccessDo( 'AddtoWP', function () 
-				collection:addPhotos(lrid)
-			end ) 
+			-- Collection bestimmen
+			local new_collection
+			local path = search[i]['path']
+			local index = 0
+			--if path == 'Neu/' then
+				--Log(path)
+			--end
+			
+			index = findValueInArray(all_paths, path)
+			if index > 0 then
+				new_collection = all_collections[index]
+			else
+				new_collection = collection
+			end
+
+			local name = new_collection:getCollectionInfoSummary()['name']
+			Log(path .. '=' .. name)
+
+			catalog:withWriteAccessDo( 'AddtoWP', function () 
+					new_collection:addPhotos(lrid)
+				end ) 
 		end
 	end )
 

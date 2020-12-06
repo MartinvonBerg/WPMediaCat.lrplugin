@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = true
+local DebugSync = false
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -544,15 +544,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         else
           lrid = nil
         end
-        --lrid = nil -- debug
+        
         if lrid ~=nil then
           foundph[nfound] = mediatable[i] 
-          searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, }
+          searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, path = sub}
           nfound = nfound +1
         else
           notfound[nnotfound] = mediatable[i]
           nnotfound = nnotfound +1
         end
+
         if pscope:isCanceled() then pscope:cancel() end
         pscope:setPortionComplete(0.2 + i * pscopeadd)
 
@@ -588,14 +589,14 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         end
       end
 
-      Level1[m] = result
+      Level1[m] = result -- enthält alle Collections in der Reihenfolge wie Pfade in paths
     end
 
     if pscope:isCanceled() then pscope:cancel() end
     pscope:setPortionComplete(0.65)
     
     -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
-    addToWPColl(collection, searchDesc, foundph) 
+    addToWPColl(collection, searchDesc, foundph, Level1, paths) 
     ------------------------------------------------------------------------
 
     LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
