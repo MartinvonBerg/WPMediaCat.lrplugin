@@ -387,9 +387,9 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
   end
 
-  -- Suchlauf bei Debuggin verkürzen
+  -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -424,6 +424,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         row = ExtractDataFromREST(result[i])
         local index = runs * perpage + i
         mediatable[index] = row
+        if row == {} then
+          local str = inspect(result)
+          Log('Z429: ' .. str)
+        end
         i = i+1
       end
       
@@ -436,7 +440,8 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       end
       
     end
- 
+    
+    Log('End While')
     LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
     pscope:setPortionComplete(0.2)
 
@@ -460,14 +465,25 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         local filen = mediatable[i].filen
         local success = false
         local lrid
-        --if filen:find('Chile09_0322',1,true) then -- _1179 _1259
-        --  local b = '3'
-        --end
+        if filen == nil or filen == 'nil' then -- _1179 _1259 --filen:find('Chile09_0322',1,true)
+          local str = inspect(mediatable[i])
+          Log('Nr : ' .. i .. str)
+          --local b = '3'
+          break
+        end
         if pscope:isCanceled() then pscope:cancel() end 
 
         -- Pfade für Collection und CollectionSet bestimmen
         local path = mediatable[i].phurl
-        local pathlist = strsplit(path, '/' )
+        local pathlist = {}
+
+        if path == nil or path == 'nil' then 
+          local str = inspect (mediatable[i])
+          Log(str) 
+        else
+          pathlist = strsplit(path, '/' )
+        end 
+
         local uploadindex = findValueInArray (pathlist, 'uploads')
         sub =''
         for c=uploadindex+1, #pathlist-1 do -- hier wird immer nur ein pfad durchsucht
@@ -483,7 +499,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         end
         -----------------------------------------
 
-        if #filen > 3 then
+        if #filen > 3 and mediatable[i] ~= {} then
         -- suche mit Dateiname aus WP 
           success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )

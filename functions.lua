@@ -1,20 +1,10 @@
 -- special helper functions for the LR-SDK-API
 ---
---local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
---local LrPathUtils = import 'LrPathUtils'
 local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
---local LrProgressScope = import( 'LrProgressScope' )
---local LrFunctionContext = import 'LrFunctionContext'
---local LrExportSession = import 'LrExportSession'
---local LrShell = import 'LrShell'
---local LrMD5 = import 'LrMD5'
---local LrPhotoInfo = import 'LrPhotoInfo'
---local LrSelection = import 'LrSelection'
---local LrSystemInfo = import 'LrSystemInfo'
 
 
 ----- Debug -----------
@@ -142,11 +132,11 @@ function ExtractDataFromREST( restdata )
 	local result = {} 
 	result[i] = restdata
 	local row = {}
-  local lrid, fname, n
+  	local lrid, fname, n
   
-  if restdata == nil or restdata == '' or restdata == 'nil' or restdata == {} then
-    return row
-  end
+	if restdata == nil or restdata == '' or restdata == 'nil' or restdata == {} or result[i].media_type == 'file' or result[i].mime_type == "image/x-icon"  then -- mime_type = \"image/x-icon\"
+		return row
+	end
   
 	local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
 	local ii,j = string.find(str,'original_image') -- den vollen Filename suchen
@@ -154,8 +144,11 @@ function ExtractDataFromREST( restdata )
 	  fname = result[i].media_details.original_image
 	else
 	  fname = result[i].media_details.file
+	  if fname == nil or fname == 'nil' then Log(str) 
+	  else
 	  fname = getfile(fname)
 	  fname, n = fname:gsub('-scaled','')
+	  end
 	end
 	
 	local function findTextinHTML( html )
@@ -421,7 +414,7 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 	LrTasks.startAsyncTask(function ()
 		LrMobdebug.on()
 		local str =inspect(all_paths)
-		Log('Pahts in addToWPColl: ', str)
+		Log('Paths in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
 		local len = #search
 		local selphoto
@@ -490,11 +483,17 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 			end
 
 			local name = new_collection:getCollectionInfoSummary()['name']
-			Log(path .. '=' .. name)
+			--Log(path .. '=' .. name)
 
-			catalog:withWriteAccessDo( 'AddtoWP', function () 
-					new_collection:addPhotos(lrid)
-				end ) 
+			local wptimestamp = photos[i].datecreated
+			local lrtime = lrid[1]:getRawMetadata( 'dateTimeOriginal' ) --  dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
+			lrtime = mytonumber(lrtime)
+			if lrtime == 'nil' then lrtime = 0 end
+			local diff = lrtime - wptimestamp
+			Log(photos[i].filen  .. ' WPtime: ' .. wptimestamp .. ' LRtime: ' .. lrtime .. ' Diff: ' .. diff)	
+			--catalog:withWriteAccessDo( 'AddtoWP', function () 
+			--		new_collection:addPhotos(lrid)
+			--end ) 
 		end
 	end )
 

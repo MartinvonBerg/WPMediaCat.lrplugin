@@ -119,6 +119,10 @@ function strsplit(string, sSeparator, nMax, bRegexp)
 
     local aRecord = {}
 
+    if string == nil or string == 'nil' then
+        return aRecord
+    end
+
     if string:len() > 0 then
         local bPlain = not bRegexp
         nMax = nMax or -1
