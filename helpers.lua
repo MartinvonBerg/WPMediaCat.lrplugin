@@ -16,8 +16,9 @@ function SplitFilename(strFilename)
 	return string.match(strFilename, "(.-)%.(%a+)")
 end
 
+--replhyphen '-' with underscore '_' in string
 function replhyphen(filen)
-	-- replhyphen '-' with underscore '_' in string
+	
 	filen = filen:reverse()
 	local nfound = 0
 	local newstring = filen

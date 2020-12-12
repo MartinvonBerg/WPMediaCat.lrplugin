@@ -445,7 +445,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
     pscope:setPortionComplete(0.2)
 
-    -- Suche die Fotos im LR-Catalog
+    -- Suche die Fotos im lokalen LR-Catalog (Eigentlich eine Vorsuche zur Bestimmung der Suchmethode)
     local foundph = {}
     local notfound = {}
     local nfound = 1
@@ -460,15 +460,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     Log('Use Cat: ' .. sqcat1)
 
     ----------------------------------------------------------
-    -- Suchlauf
+    -- Suchlauf für alle Dateien
     for i=1,#mediatable do
         local filen = mediatable[i].filen
         local success = false
         local lrid
-        if filen == nil or filen == 'nil' then -- _1179 _1259 --filen:find('Chile09_0322',1,true)
+        local searchdesriptor = ''
+
+        if filen == nil or filen == 'nil' then 
           local str = inspect(mediatable[i])
-          Log('Nr : ' .. i .. str)
-          --local b = '3'
+          Log('Filename nicht definiert. Nr : ' .. i .. str)
           break
         end
         if pscope:isCanceled() then pscope:cancel() end 
@@ -498,9 +499,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
           end
         end
         -----------------------------------------
-
+        
+        -- Bestimmung der Suchmethode
         if #filen > 3 and mediatable[i] ~= {} then
         -- suche mit Dateiname aus WP 
+        -- Berlin-2020-06-860-Bearbeitet
+        -- Franken-2020-05-17
+          if filen:find('Berlin-2020-06-860-Bearbeitet',1,true) then
+            Log('Special found')
+          end
+
           success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
@@ -536,35 +544,52 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             end
           end -- end if lrid
           
+          -- Suche mit basename ohne Dateiendung und Platzhaltern in der lokalen Kopie des LR Katalogs
+          -- TODO: Hier fehlt die Beschränkung, wenn mehr als ein Bild gefunden wurde, siehe oben
           if lrid == nil then
             local base, ext = SplitFilename(filen)
+            base = string.gsub( base,"-","_") -- '-' Unterstrich ist ein Platzhalter für EIN beliebiges Zeichen in SQL. Suche muss mit like erfolgen
+            
             if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName is '" .. base .."'\" > " .. p .. "/test.txt") 
+              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .."'\" > " .. p .. "/test.txt") 
               lrid = LrFileUtils.readFile( p ..'/test.txt' )
               if #lrid > 9 then lrid = string.sub(lrid,1,7) end
               lrid = tonumber(lrid)
+
               if lrid ~= nil then
-                filen = base
+                base = string.gsub( base,"_"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
+                searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
               end
+
             end
           end
+
+          -- Suche nach virt. Kopie
+          -- Tabelle: 
+          --success = LrTasks.execute( sqcat1 .. " \"select id_local from Adobe_images where copyName like '" .. filen .."%'\" > " .. p .. "/test.txt")
+          -- wenn gefunden, dann virt. Kopie dann searchdesriptor entsrprechend anpassen. Auch in WPcoll!
         
           if lrid == nil then
-            filen = replhyphen(filen)
+            filen = string.gsub( filen,"-","_")
             success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
           end
-        --- ende dersuche
+        --- ende der suche mit sqlite
         else
           lrid = nil
         end
         
         if lrid ~=nil then
           foundph[nfound] = mediatable[i] 
-          searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, path = sub}
+          if searchdesriptor == '' then
+            searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, path = sub}
+          else
+            searchDesc[nfound] = searchdesriptor
+          end 
           nfound = nfound +1
+
         else
           notfound[nnotfound] = mediatable[i]
           nnotfound = nnotfound +1

@@ -1,0 +1,16 @@
+s = {
+	id = "BDF1A22C-724D-419C-A18B-BE6024097579",
+	internalName = "Smart-Sammlung",
+	title = "Smart-Sammlung",
+	type = "LibrarySmartCollection",
+	value = {
+		{
+			criteria = "filename",
+			operation = "all",
+			value = "Berlin 2020 06 860 Bearbeitet DxO",
+			value2 = "",
+		},
+		combine = "intersect",
+	},
+	version = 0,
+}
