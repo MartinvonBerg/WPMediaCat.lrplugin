@@ -261,7 +261,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  }
 	elseif folder ~= '' then
 	  --Header-Wert: Content-Disposition = attachment; filename=example.jpg OHNE Anführungszeichen!
-	  url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/addtofolder/" .. folder
+	  url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/addtofolder/" .. folder
 	  httphead = {
 		{field='Authorization', value=hash},
 		{field='Content-Disposition', value='attachment; filename=' .. filen},
@@ -281,7 +281,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		wpid = tonumber(result['id'])
 		restData = ExtractDataFromREST(result)
   
-	elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/wpcat/v1/addtofolder/"
+	elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
 		wpid = tonumber(result['id'])
 		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
 		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
@@ -318,7 +318,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
   
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
 	  
-	local url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/update/" .. tostring(wpid)
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid)
 	  
 	local result, headers = LrHttp.post( url, imgfile, httphead )
   
@@ -417,7 +417,6 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 		Log('Paths in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
 		local len = #search
-		len = 1
 		local selphoto
 			
 		for i=1,len do
@@ -492,9 +491,9 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 			if lrtime == 'nil' then lrtime = 0 end
 			local diff = lrtime - wptimestamp
 			Log(photos[i].filen  .. ' WPtime: ' .. wptimestamp .. ' LRtime: ' .. lrtime .. ' Diff: ' .. diff .. ' N lrid =' .. #lrid)	
-			--catalog:withWriteAccessDo( 'AddtoWP', function () 
-			--		new_collection:addPhotos(lrid)
-			--end ) 
+			catalog:withWriteAccessDo( 'AddtoWP', function () 
+					new_collection:addPhotos(lrid)
+			end ) 
 		end
 	end )
 
@@ -544,7 +543,7 @@ function UpdateKeys( publishSettings, photometa, wpid )
 	local image_meta = JSON:encode(photometa)
   
 	  
-	local url = publishSettings['siteURL'] .. "/wp-json/wpcat/v1/update_meta/" .. tostring(wpid)
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update_meta/" .. tostring(wpid)
 	  
 	local result, headers = LrHttp.post( url, image_meta, httphead )
   

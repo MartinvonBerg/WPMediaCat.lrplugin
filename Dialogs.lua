@@ -19,8 +19,8 @@ require 'Post'
 ------------- Debug ----------------------
 
 local inspect = require 'inspect' 
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
  ----------------------------------------
 
 dialogs = {}

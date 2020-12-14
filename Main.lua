@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = true
+local DebugSync = false
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -389,7 +389,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 10 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 16 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -472,6 +472,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
           Log('Filename nicht definiert. Nr : ' .. i .. str)
           break
         end
+        
         if pscope:isCanceled() then pscope:cancel() end 
 
         -- Pfade für Collection und CollectionSet bestimmen
@@ -502,12 +503,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
         -- Bestimmung der Suchmethode
         if #filen > 3 and mediatable[i] ~= {} then
-     
+          Log('Suche nach : ' .. filen .. ' ---------------------------')
           -- Methode I : Voller Dateiname
           success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)
+          if lrid ~= nil then
+            Log('M I   : ' .. filen .. ' ID = ' .. lrid)
+          end
+
         
           -- Methode II : originalFilename mit like und Aussortieren der mehrfach gefundenen
           if lrid == nil then 
@@ -517,7 +522,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                       
             if #sqltab == 1 then -- einmal gefunden
               lrid = sqltab[1][1] 
-               
+              Log('M II  : ' .. filen .. ' ID = ' .. lrid) 
             elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
               local csel = 0
               local ncol = 0
@@ -537,6 +542,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                 lrid = sqltab[csel][1]
                 filen = sqltab[csel][2]
               end
+              Log('M II  : ' .. filen .. ' ID = ' .. lrid)
             end  
           end -- end if lrid
           
@@ -546,7 +552,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             base = string.gsub( base,"-","_") -- '-' Unterstrich ist ein Platzhalter für EIN beliebiges Zeichen in SQL. Suche muss mit like erfolgen
             
             if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .."'\" > " .. p .. "/test.txt") 
+              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .. "%'\" > " .. p .. "/test.txt") 
               lrid = LrFileUtils.readFile( p ..'/test.txt' )
               if #lrid > 9 then lrid = string.sub(lrid,1,7) end
               lrid = tonumber(lrid)
@@ -554,6 +560,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               if lrid ~= nil then
                 base = string.gsub( base,"_"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
                 searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
+                Log('M III : ' .. base .. ' ID = ' .. lrid)
               end
 
             end
@@ -562,16 +569,25 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
           -- Methode IV : Suche nach virt. Kopie in der lokalen Kopie des LR Katalogs
           if lrid == nil then
             local base, ext = SplitFilename(filen)
+            base = string.gsub( base,"ß","_")
+            base = string.gsub( base,"ö","_")
+            base = string.gsub( base,"ä","_")
+            base = string.gsub( base,"ü","_")
                         
             if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select id_local from Adobe_images where copyName like '" .. base .."'\" > " .. p .. "/test.txt") 
-              lrid = LrFileUtils.readFile( p ..'/test.txt' )
+              success = LrTasks.execute( sqcat1 .. " \"select rootFile from Adobe_images where copyName like '" .. base .."'\" > " .. p .. "/test.txt") -- liefert die id_local das master_images
+              lrid = LrFileUtils.readFile( p ..'/test.txt' ) 
               if #lrid > 9 then lrid = string.sub(lrid,1,7) end
               lrid = tonumber(lrid)
+              
 
               if lrid ~= nil then
-                  Log('Virt. Kopie ' .. base .. ' ID = ' .. lrid)
-                  --searchdesriptor = { criteria = "copyname", operation = "==", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
+                  success = LrTasks.execute( sqcat1 .. " \"select baseName from AgLibraryFile where id_local like '" .. lrid .. "%'\" > " .. p .. "/test.txt")
+                  base = LrFileUtils.readFile( p ..'/test.txt' ) 
+                  base = string.gsub(base, '\r\n', '')
+                  base = string.gsub( base,"_"," ")
+                  Log('M IV  : ' .. base .. ' ID = ' .. lrid)
+                  searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
               end
 
             end
@@ -584,6 +600,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             lrid = LrFileUtils.readFile( p ..'/test.txt' )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
+
+            if lrid ~= nil then
+              Log('M V   : ' .. filen .. ' ID = ' .. lrid)
+            end
           end
 
         --- ende der suche mit sqlite
