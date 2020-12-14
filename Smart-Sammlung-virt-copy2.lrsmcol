@@ -1,0 +1,11 @@
+s = {
+	value = {
+		{
+			criteria = "copyname",
+			operation = "all",
+			value = "Singapur-Marina-Bay-Nachtaufnahme",
+			value2 = "",
+		},
+		combine = "intersect",
+	},
+}

@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = false
+local DebugSync = true
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -389,7 +389,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 20 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 10 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -442,7 +442,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
     
     Log('End While')
-    LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
+    --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
     pscope:setPortionComplete(0.2)
 
     -- Suche die Fotos im lokalen LR-Catalog (Eigentlich eine Vorsuche zur Bestimmung der Suchmethode)
@@ -499,21 +499,17 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
           end
         end
         -----------------------------------------
-        
+
         -- Bestimmung der Suchmethode
         if #filen > 3 and mediatable[i] ~= {} then
-        -- suche mit Dateiname aus WP 
-        -- Berlin-2020-06-860-Bearbeitet
-        -- Franken-2020-05-17
-          if filen:find('Berlin-2020-06-860-Bearbeitet',1,true) then
-            Log('Special found')
-          end
-
+     
+          -- Methode I : Voller Dateiname
           success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
           lrid = LrFileUtils.readFile( p ..'/test.txt' )
           if #lrid > 9 then lrid = string.sub(lrid,1,7) end
           lrid = tonumber(lrid)
         
+          -- Methode II : originalFilename mit like und Aussortieren der mehrfach gefundenen
           if lrid == nil then 
             success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
             local sqltab = {}
@@ -521,7 +517,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                       
             if #sqltab == 1 then -- einmal gefunden
               lrid = sqltab[1][1] 
-              
+               
             elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
               local csel = 0
               local ncol = 0
@@ -541,11 +537,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                 lrid = sqltab[csel][1]
                 filen = sqltab[csel][2]
               end
-            end
+            end  
           end -- end if lrid
           
-          -- Suche mit basename ohne Dateiendung und Platzhaltern in der lokalen Kopie des LR Katalogs
-          -- TODO: Hier fehlt die Beschränkung, wenn mehr als ein Bild gefunden wurde, siehe oben
+          -- Methode III : Suche mit basename ohne Dateiendung und Platzhaltern in der lokalen Kopie des LR Katalogs
           if lrid == nil then
             local base, ext = SplitFilename(filen)
             base = string.gsub( base,"-","_") -- '-' Unterstrich ist ein Platzhalter für EIN beliebiges Zeichen in SQL. Suche muss mit like erfolgen
@@ -564,11 +559,25 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             end
           end
 
-          -- Suche nach virt. Kopie
-          -- Tabelle: 
-          --success = LrTasks.execute( sqcat1 .. " \"select id_local from Adobe_images where copyName like '" .. filen .."%'\" > " .. p .. "/test.txt")
-          -- wenn gefunden, dann virt. Kopie dann searchdesriptor entsrprechend anpassen. Auch in WPcoll!
-        
+          -- Methode IV : Suche nach virt. Kopie in der lokalen Kopie des LR Katalogs
+          if lrid == nil then
+            local base, ext = SplitFilename(filen)
+                        
+            if base ~= nil then
+              success = LrTasks.execute( sqcat1 .. " \"select id_local from Adobe_images where copyName like '" .. base .."'\" > " .. p .. "/test.txt") 
+              lrid = LrFileUtils.readFile( p ..'/test.txt' )
+              if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+              lrid = tonumber(lrid)
+
+              if lrid ~= nil then
+                  Log('Virt. Kopie ' .. base .. ' ID = ' .. lrid)
+                  --searchdesriptor = { criteria = "copyname", operation = "==", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
+              end
+
+            end
+          end
+          
+          -- Methode V : 
           if lrid == nil then
             filen = string.gsub( filen,"-","_")
             success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
@@ -576,6 +585,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             if #lrid > 9 then lrid = string.sub(lrid,1,7) end
             lrid = tonumber(lrid)
           end
+
         --- ende der suche mit sqlite
         else
           lrid = nil
@@ -583,6 +593,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         
         if lrid ~=nil then
           foundph[nfound] = mediatable[i] 
+
           if searchdesriptor == '' then
             searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, path = sub}
           else
@@ -640,11 +651,11 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     addToWPColl(collection, searchDesc, foundph, Level1, paths) 
     ------------------------------------------------------------------------
 
-    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+    LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
+    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
     pscope:setPortionComplete(0.8)
     if pscope:isCanceled() then pscope:cancel() end
-    LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
-    
+        
     -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
     catalog:withWriteAccessDo( 'AddMetaData', function () 
       for i=1, nfound-1 do
@@ -671,7 +682,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     csvwrite(p2 .. '/notfound.csv',notfound, ';') 
     
     pscope:done()
-    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
 
     -- TODO: Download der nicht gefundenen bilder zum Katalog
     -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.

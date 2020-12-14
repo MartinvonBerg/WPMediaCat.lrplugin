@@ -416,12 +416,18 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 		local str =inspect(all_paths)
 		Log('Paths in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
-		local len = #search
-		len = 1
 		local selphoto
 			
-		for i=1,len do
-			local lrid = catalog:findPhotos {
+		for i=1, #search do
+
+			local searchDesc = {}
+
+			if search[i]['criteria'] == 'copyname' then
+				searchDesc = { 
+					{ criteria = search[i]['criteria'], operation = search[i]['operation'], value = search[i]['value'], } ,
+					combine = "intersect",
+				} 
+			else
 				searchDesc = { 
 					{ criteria = search[i]['criteria'], operation = search[i]['operation'], value = search[i]['value'], } ,
 					{ criteria = "copyname", -- selektiert die Kopien aus
@@ -429,8 +435,15 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 						value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
 					}, 
 				combine = "intersect"} -- UND-Verknüpfung der Kriterien
-			}
+			end
 
+			local str = inspect(searchDesc)
+			Log(str)
+
+			local lrid = catalog:findPhotos {
+				searchDesc 
+			}
+		
 			--------- Auswahl bei mehr als einem gefundenen Foto
 			if lrid[2] ~= nil then
 				local label = {} 
@@ -472,10 +485,7 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 			local new_collection
 			local path = search[i]['path']
 			local index = 0
-			--if path == 'Neu/' then
-				--Log(path)
-			--end
-			
+					
 			index = findValueInArray(all_paths, path)
 			if index > 0 then
 				new_collection = all_collections[index]
@@ -483,18 +493,19 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 				new_collection = collection
 			end
 
-			local name = new_collection:getCollectionInfoSummary()['name']
+			--local name = new_collection:getCollectionInfoSummary()['name']
 			--Log(path .. '=' .. name)
 
 			local wptimestamp = photos[i].datecreated
-			--local lrtime = lrid[1]:getRawMetadata( 'dateTimeOriginal' ) --  dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
-			local lrtime = 0 --mytonumber(lrtime)
+			local lrtime = lrid[1]:getRawMetadata( 'dateTimeOriginal' ) --  dateTimeOriginal: (number) The date and time of capture (seconds since midnight GMT January 1, 2001)
+			lrtime = mytonumber(lrtime)
 			if lrtime == 'nil' then lrtime = 0 end
 			local diff = lrtime - wptimestamp
-			Log(photos[i].filen  .. ' WPtime: ' .. wptimestamp .. ' LRtime: ' .. lrtime .. ' Diff: ' .. diff .. ' N lrid =' .. #lrid)	
-			--catalog:withWriteAccessDo( 'AddtoWP', function () 
-			--		new_collection:addPhotos(lrid)
-			--end ) 
+			Log(photos[i].filen  .. ' WPtime: ' .. wptimestamp .. ' LRtime: ' .. lrtime .. ' Diff: ' .. diff .. ' len: ' .. #lrid )	
+			
+			catalog:withWriteAccessDo( 'AddtoWP', function () 
+					new_collection:addPhotos(lrid)
+			end ) 
 		end
 	end )
 

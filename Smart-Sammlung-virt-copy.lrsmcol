@@ -1,0 +1,16 @@
+s = {
+	id = "32911496-28EC-4183-9367-7F1AD74CE1A6",
+	internalName = "Smart-Sammlung-virt-copy",
+	title = "Smart-Sammlung-virt-copy",
+	type = "LibrarySmartCollection",
+	value = {
+		{
+			criteria = "copyname",
+			operation = "any",
+			value = "Singapur-Marina-Bay",
+			value2 = "",
+		},
+		combine = "intersect",
+	},
+	version = 0,
+}
