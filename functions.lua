@@ -186,8 +186,10 @@ function ExtractDataFromREST( restdata )
           descr = _descr,  
           caption = _caption,
           alt  = result[i].alt_text, 
-          origfile = fname, 
-          MD5 =  result[i].md5_original_file, -- table contains MD5 und filesize of fname on server
+		  origfile = fname, 
+		  origurl = result[i].guid.rendered,
+		  MD5 =  result[i].md5_original_file, -- table contains MD5 und filesize of fname on server
+		  mime = result[i].mime_type,
 		  } 
    
 	return row
@@ -418,54 +420,61 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 		local catalog = LrApplication.activeCatalog()
 		local len = #search
 		local selphoto
+		local lrid
 			
 		for i=1,len do
-			local lrid = catalog:findPhotos {
-				searchDesc = { 
-					{ criteria = search[i]['criteria'], operation = search[i]['operation'], value = search[i]['value'], } ,
-					{ criteria = "copyname", -- selektiert die Kopien aus
-						operation = "noneOf",
-						value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
-					}, 
-				combine = "intersect"} -- UND-Verknüpfung der Kriterien
-			}
+			if search[i]['criteria'] ~= nil then
+				------------------------------
+				lrid = catalog:findPhotos {
+					searchDesc = { 
+						{ criteria = search[i]['criteria'], operation = search[i]['operation'], value = search[i]['value'], } ,
+						{ criteria = "copyname", -- selektiert die Kopien aus
+							operation = "noneOf",
+							value = "Kopie", -- TODO: International? oder im PublishSettingsMenu einstellen?
+						}, 
+					combine = "intersect"} -- UND-Verknüpfung der Kriterien
+				}
 
-			--------- Auswahl bei mehr als einem gefundenen Foto
-			if lrid[2] ~= nil then
-				local label = {} 
-				local sel = 0
-				local nred = 0
-				local csel = 0
-				local ncol = 0
-				local coll = {}
-				local pubcoll = {}
-				
-				for k, ph in ipairs(lrid) do
-				label[k] = ph:getFormattedMetadata('label')
-				if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
-					sel = k
-					nred = nred +1
+				--------- Auswahl bei mehr als einem gefundenen Foto
+				if lrid[2] ~= nil then
+					local label = {} 
+					local sel = 0
+					local nred = 0
+					local csel = 0
+					local ncol = 0
+					local coll = {}
+					local pubcoll = {}
+					
+					for k, ph in ipairs(lrid) do
+					label[k] = ph:getFormattedMetadata('label')
+					if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
+						sel = k
+						nred = nred +1
+					end
+					coll[k] = ph:getContainedCollections()
+					pubcoll[k] = ph:getContainedPublishedCollections()
+					if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
+						csel = k
+						ncol = ncol +1
+					end
+					
+					end
+					
+					if nred == 1 then
+					selphoto = {lrid[sel]}
+					lrid = selphoto
+					elseif ncol == 1 then
+					selphoto = {lrid[csel]}
+					lrid = selphoto
+					end
+					
 				end
-				coll[k] = ph:getContainedCollections()
-				pubcoll[k] = ph:getContainedPublishedCollections()
-				if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
-					csel = k
-					ncol = ncol +1
-				end
 				
-				end
-				
-				if nred == 1 then
-				selphoto = {lrid[sel]}
-				lrid = selphoto
-				elseif ncol == 1 then
-				selphoto = {lrid[csel]}
-				lrid = selphoto
-				end
-				
+				photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+				----------------------------
+			else
+				lrid = photos[i].lrid -- {} außen rum ???
 			end
-			
-			photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
 
 			-- Collection bestimmen
 			local new_collection
@@ -491,6 +500,7 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 			if lrtime == 'nil' then lrtime = 0 end
 			local diff = lrtime - wptimestamp
 			Log(photos[i].filen  .. ' WPtime: ' .. wptimestamp .. ' LRtime: ' .. lrtime .. ' Diff: ' .. diff .. ' N lrid =' .. #lrid)	
+
 			catalog:withWriteAccessDo( 'AddtoWP', function () 
 					new_collection:addPhotos(lrid)
 			end ) 

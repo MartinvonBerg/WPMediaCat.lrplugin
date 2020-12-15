@@ -391,7 +391,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 3 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 5 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -662,7 +662,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         if level < ncollections then
           catalog:withWriteAccessDo( 'Create1stLevel', function ()
             result = pubService:createPublishedCollectionSet( coll, collparent, true) -- Ergebnis kann nicht übergeben werden, führt zu Fehler!
-          end)
+          end )
           -- set this to parent -- Fehl Suche in vorhandenen, ob die Coll bereits vorhanden ist
           collparent = result
         elseif level == ncollections then
@@ -678,6 +678,64 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
     if pscope:isCanceled() then pscope:cancel() end
     pscope:setPortionComplete(0.65)
+
+    -- nicht gefundene Photos herunterladen und zum Katalog eränzen
+    local copyfile = publishSettings.doLocalCopy
+    local copypath = publishSettings.localPath
+
+    if copyfile then
+      -- prüfen, ob der pfad existiert
+      -- create download-directory 
+      local _exists = LrFileUtils.exists( copypath )
+      if not _exists then
+        LrFileUtils.createDirectory( copypath )
+      end
+
+      -- fotos herunterladen
+      for nn=1,#notfound do
+        if notfound[nn].mime == 'image/jpeg' or notfound[nn].mime == 'image/png' then
+          local newfilepath = copypath .. '\\' .. notfound[nn].filen
+          if not LrFileUtils.exists( newfilepath ) then
+
+            local newlrphoto = nil
+            Log('ADD-2-CAT: ' .. notfound[nn].origurl .. ' -> ' .. newfilepath)
+            --- AsyncTask
+            LrTasks.startAsyncTask(function ()
+              local httphead = {
+                {field='Content-Type', value=notfound[nn].mime}, --- noch für png und gif erweitern
+                {field='Application', value='application/octet-stream'},
+                }
+              local newfilecontent, headers =LrHttp.get(notfound[nn].origurl)
+              local file = assert(io.open(newfilepath, "wb"))
+              file:write(newfilecontent)
+              file:close()
+            end )
+          
+            -- Sleep --
+            LrTasks.sleep(2)
+            if not LrFileUtils.exists( newfilepath ) then
+              LrTasks.sleep(10)
+            end
+          
+            if LrFileUtils.exists( newfilepath ) == 'file' then
+              catalog:withWriteAccessDo( 'AddNewPhoto', function ()
+                newlrphoto = catalog:addPhoto( newfilepath )
+              end )
+              
+              -- lrphoto and foundph anhängen. lrid = lrphoto setzen
+              notfound[nn].lrid = {newlrphoto}
+              foundph[#foundph +1] = notfound[nn]
+              nfound = nfound +1
+              searchDesc[#searchDesc +1] = {}
+            end
+            
+          end -- if not exists
+          
+        end -- if mime-type 
+      end -- for
+
+    end -- copyfile trie
+
     
     -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
     addToWPColl(collection, searchDesc, foundph, Level1, paths) 
@@ -704,17 +762,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end ) -- catalog:withWriteAccessDo
     
     -- Write csv-File with not found Photos
-    local copyfile = exportContext.propertyTable.doLocalCopy
-    local copypath = exportContext.propertyTable.localPath
-    
-    for i=1,#foundph do
-      if foundph[i].lrid[1] == nil then
-        table.insert(notfound,foundph[i])
-        nnotfound = nnotfound +1
+    if not copyfile then
+      for i=1,#foundph do
+        if foundph[i].lrid[1] == nil then
+          table.insert(notfound,foundph[i])
+          nnotfound = nnotfound +1
+        end
       end
+      local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+      csvwrite(p2 .. '/notfound.csv',notfound, ';') 
     end
-    local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-    csvwrite(p2 .. '/notfound.csv',notfound, ';') 
     
     pscope:done()
     --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
