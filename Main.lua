@@ -25,7 +25,7 @@ local WPCatColl = 'WPCat'
 --logDebug = false
 require 'strict'
 require 'Logger'
-local DebugSync = false
+local DebugSync = true
 local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 LrMobdebug.start()
 local inspect = require 'inspect'
@@ -57,6 +57,8 @@ exportServiceProvider.exportPresetFields = {
   { key = "urlreadable", default = false},
   { key = "firstsync", default = false},
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
+  { key = 'doLocalCopy', default = true},
+	{ key = 'localPath', default = ''},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
@@ -235,8 +237,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           renderedPhoto[i][1] = photo
           renderedPhoto[i][2] = ImageID -- remoteID
           renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
-          rendition:recordPublishedPhotoId( ImageID )
           rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
+          rendition:recordPublishedPhotoId( ImageID )  
               
       elseif tonumber(wpid) == 0 then -- add new image to WP Media Catalog
           if progressScope:isCanceled() then progressScope:cancel() end 
@@ -256,12 +258,12 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
             end )
 
-            rendition:recordPublishedPhotoId( ImageID )
             rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
             renderedPhoto[i] = {}
             renderedPhoto[i][1] = photo   -- catalog photo
             renderedPhoto[i][2] = ImageID -- remoteID
             renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
+            rendition:recordPublishedPhotoId( ImageID )
             
           else
             LrDialogs.showError( result)
@@ -281,9 +283,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     
   end -- for rendition
 
-  progressScope:done()
   if #notuploaded > 0 then
-    LrDialogs.message('Could not upload images!', 'Some images were already uploaded to other collections. \nProposal: Remove from this collection.', 'warning')
+    LrDialogs.message('Could not upload images!', 'Some images were already uploaded to other collections. \nProposal: Remove from this collection or create a virtual Copy.', 'warning')
   end
 
   -- Set the edited flag as sometimes it is reset by the pscope afterwards. Don't know why this happens
@@ -313,6 +314,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   end
   ------------------------ End set edited flag
 
+  progressScope:done()
 end
 
 -- called if somebody wants to move a published collection. This is not allowed. Delete first, create new collection and publish this one.
@@ -389,7 +391,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 16 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 3 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -503,26 +505,37 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
         -- Bestimmung der Suchmethode
         if #filen > 3 and mediatable[i] ~= {} then
+
           Log('Suche nach : ' .. filen .. ' ---------------------------')
+          local ii,j = filen:find('Kitzb_Alpen_2018-1',1,true)
+          if ii ~= nil then
+            local os = 'WIN'
+          end
+
           -- Methode I : Voller Dateiname
           success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
-          lrid = LrFileUtils.readFile( p ..'/test.txt' )
-          if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-          lrid = tonumber(lrid)
+          local sqltab = {}
+          sqltab = sqlread( p .. "/test.txt", '|')
+          if #sqltab >= 1 then -- einmal gefunden
+            lrid = sqltab[1][1] 
+          end
+          --if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+          --lrid = tonumber(lrid)
           if lrid ~= nil then
-            Log('M I   : ' .. filen .. ' ID = ' .. lrid)
+            Log('M I   : ' .. filen .. ' ID = ' .. inspect(sqltab))
           end
 
         
           -- Methode II : originalFilename mit like und Aussortieren der mehrfach gefundenen
           if lrid == nil then 
-            success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
+            local base, ext = SplitFilename(filen)
+            success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. base .."%'\" > " .. p .. "/test.txt") 
             local sqltab = {}
             sqltab = sqlread( p .. "/test.txt", '|')
                       
             if #sqltab == 1 then -- einmal gefunden
               lrid = sqltab[1][1] 
-              Log('M II  : ' .. filen .. ' ID = ' .. lrid) 
+              Log('M II-1: ' .. filen .. ' ID = ' .. inspect(sqltab)) 
             elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
               local csel = 0
               local ncol = 0
@@ -542,14 +555,19 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                 lrid = sqltab[csel][1]
                 filen = sqltab[csel][2]
               end
-              Log('M II  : ' .. filen .. ' ID = ' .. lrid)
+              Log('M II-2: ' .. filen .. ' ID = ' .. inspect(sqltab))
             end  
           end -- end if lrid
+          
           
           -- Methode III : Suche mit basename ohne Dateiendung und Platzhaltern in der lokalen Kopie des LR Katalogs
           if lrid == nil then
             local base, ext = SplitFilename(filen)
             base = string.gsub( base,"-","_") -- '-' Unterstrich ist ein Platzhalter für EIN beliebiges Zeichen in SQL. Suche muss mit like erfolgen
+            base = string.gsub( base,"ß","_")
+            base = string.gsub( base,"ö","_")
+            base = string.gsub( base,"ä","_")
+            base = string.gsub( base,"ü","_")
             
             if base ~= nil then
               success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .. "%'\" > " .. p .. "/test.txt") 
@@ -560,25 +578,32 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               if lrid ~= nil then
                 base = string.gsub( base,"_"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
                 searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
-                Log('M III : ' .. base .. ' ID = ' .. lrid)
+                Log('M III : ' .. base .. ' ID = ' .. inspect(lrid))
               end
 
             end
           end
 
+         
           -- Methode IV : Suche nach virt. Kopie in der lokalen Kopie des LR Katalogs
           if lrid == nil then
             local base, ext = SplitFilename(filen)
+            base = string.gsub( base,"-","_")
             base = string.gsub( base,"ß","_")
             base = string.gsub( base,"ö","_")
             base = string.gsub( base,"ä","_")
             base = string.gsub( base,"ü","_")
                         
             if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select rootFile from Adobe_images where copyName like '" .. base .."'\" > " .. p .. "/test.txt") -- liefert die id_local das master_images
-              lrid = LrFileUtils.readFile( p ..'/test.txt' ) 
-              if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-              lrid = tonumber(lrid)
+              success = LrTasks.execute( sqcat1 .. " \"select rootFile from Adobe_images where copyName like '" .. base .."%'\" > " .. p .. "/test.txt") -- liefert die id_local das master_images
+              local sqltab = {}
+              sqltab = sqlread( p .. "/test.txt", '|')
+              if #sqltab > 0 then -- einmal gefunden
+                lrid = sqltab[1][1] 
+              end
+              --lrid = LrFileUtils.readFile( p ..'/test.txt' ) 
+              --if #lrid > 9 then lrid = string.sub(lrid,1,7) end
+              --lrid = tonumber(lrid)
               
 
               if lrid ~= nil then
@@ -586,23 +611,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                   base = LrFileUtils.readFile( p ..'/test.txt' ) 
                   base = string.gsub(base, '\r\n', '')
                   base = string.gsub( base,"_"," ")
-                  Log('M IV  : ' .. base .. ' ID = ' .. lrid)
+                  Log('M IV  : ' .. base .. ' ID = ' .. inspect(sqltab))
                   searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
               end
 
-            end
-          end
-          
-          -- Methode V : 
-          if lrid == nil then
-            filen = string.gsub( filen,"-","_")
-            success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where originalFilename like '" .. filen .."%'\" > " .. p .. "/test.txt") 
-            lrid = LrFileUtils.readFile( p ..'/test.txt' )
-            if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-            lrid = tonumber(lrid)
-
-            if lrid ~= nil then
-              Log('M V   : ' .. filen .. ' ID = ' .. lrid)
             end
           end
 
@@ -692,6 +704,9 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end ) -- catalog:withWriteAccessDo
     
     -- Write csv-File with not found Photos
+    local copyfile = exportContext.propertyTable.doLocalCopy
+    local copypath = exportContext.propertyTable.localPath
+    
     for i=1,#foundph do
       if foundph[i].lrid[1] == nil then
         table.insert(notfound,foundph[i])

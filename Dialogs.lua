@@ -42,19 +42,14 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
-					-- EntryBox( f, 'hash-Value (Basic Auth!)', 'hash'),
-					f:row {
-						f:checkbox {
-							title = "Check for Test-Mode",
-							value = bind 'DebugMode',
-						},
-					},
+					
 					f:row {
 						fill_horizontal = true,				
 						f:push_button {    -- Button mit Callback-Aufruf, der den hash-value zur Authentifizierung prüft
 							title = "Test Login",
 							action = function( button ) -- test the wp login
 								Log( "Pressed Test Login button" )  -- Debugging
+								propertyTable.msgBox = ''
 								LrFunctionContext.postAsyncTaskWithContext( "testPost", function( context ) 
 									local result = CheckLogin( propertyTable )
 									if result then
@@ -82,6 +77,60 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						}
 					},
 
+					f:row {
+						--f:spacer {
+						--	width = share 'labelWidth'
+						--},
+		
+						f:checkbox {
+							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Do local Copy:",
+							value = bind 'doLocalCopy',
+						},
+		
+						f:edit_field {
+							value = bind 'localPath',
+							enabled = bind 'doLocalCopy',
+							truncation = 'middle',
+							immediate = true,
+							fill_horizontal = 1,
+						},
+					},
+
+					f:column {
+						place = 'overlapping',
+						fill_horizontal = 1,
+						
+						f:row {
+							f:static_text {
+								title = LOC "$$$/FtpUpload/ExportDialog/LocalPath=Local Path:",
+								alignment = 'right',
+								width = share 'labelWidth',
+								visible = bind 'hasNoError',
+							},
+							
+							f:static_text {
+								fill_horizontal = 1,
+								width_in_chars = 20,
+								alignment = 'right',
+								title =  bind 'localPath',
+								visible = bind 'hasNoError',
+							},
+		
+							f:static_text {
+								fill_horizontal = 0,
+								width_in_chars = 17,
+								title = ' ',
+							},
+						},
+					},
+
+					f:row {
+						f:checkbox {
+							title = "Check for Test-Mode",
+							value = bind 'DebugMode',
+						},
+					},
+
 				},
 
 		},
@@ -90,11 +139,47 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 	return result
 end
 
+function updateExportStatus( propertyTable )
+	Log('updateExportStatus aufgerufen')
+	local message = nil
+	local locp = ''
+	
+	repeat
+		-- Use a repeat loop to allow easy way to "break" out.
+		-- (It only goes through once.)
+		
+		if propertyTable.doLocalCopy then
+			locp = ''
+			locp = propertyTable.localPath 
+		end
+		
+	until true
+	
+	if message then
+		propertyTable.message = message
+		propertyTable.hasError = true
+		propertyTable.hasNoError = false
+		propertyTable.LR_cantExportBecause = message
+	else
+		propertyTable.message = nil
+		propertyTable.hasError = false
+		propertyTable.hasNoError = true
+		propertyTable.LR_cantExportBecause = nil
+	end
+	
+end
+
 -- wird bei Beginn des Dialogs aufgerufen
 -- registriert einen Observer, der bei Änderungen im Feld die genannte Funktion aufruft
 function dialogs.startDialog( propertyTable )
+	Log('startDialog aufgerufen')
 	
 	propertyTable:addObserver( 'siteURL', checkURL )
+
+	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
+	propertyTable:addObserver( 'localPath', updateExportStatus )
+
+	updateExportStatus( propertyTable )
 	
 end
 
