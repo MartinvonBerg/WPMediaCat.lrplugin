@@ -58,7 +58,10 @@ exportServiceProvider.exportPresetFields = {
   { key = "firstsync", default = false},
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
   { key = 'doLocalCopy', default = true},
-	{ key = 'localPath', default = ''},
+  { key = 'localPath', default = ''},
+  { key = 'WPalt', default = 'LRcap'},
+  { key = 'WPdescr', default = 'LRcap'},
+  { key = 'WPcap', default = 'LRtit'},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
@@ -998,6 +1001,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
   Log('WP-Plugin installed: ', publishSettings.wpplugin)
+  Log('WPalt : ' .. publishSettings.WPalt[1] .. '  WPdescr = ' .. publishSettings.WPdescr[1] .. '  WPcap = ' .. publishSettings.WPcap[1] )
     	
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",

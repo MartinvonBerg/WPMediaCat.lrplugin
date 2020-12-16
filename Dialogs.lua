@@ -2,12 +2,7 @@
 	Global login settings. Updated by the observer set up in startDialog
 	Checked by Button 'Test Login'
 	by Martin von Berg
-	TODO: Hash-value gemäß gewähltem Auth-Verfahren (OAuth, OAuth2) aus User-ID und Password berechnen!
 ]]
------ Debug -----------
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
---require "strict.lua"
 
 local LrView = import 'LrView'
 local LrDialogs = import 'LrDialogs'
@@ -15,13 +10,8 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrColor = import 'LrColor'
 local share = LrView.share
 require 'Post'
-
-------------- Debug ----------------------
-
 local inspect = require 'inspect' 
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
- ----------------------------------------
+----------------------------------------
 
 dialogs = {}
 
@@ -29,13 +19,13 @@ dialogs = {}
 function dialogs.sectionsForTopOfDialog( f, propertyTable )
  --LrMobdebug.on()
 	local bind = LrView.bind
+	propertyTable.msgBox = 'Not tested yet !'
 		
 	local result = {
 	
 		{
-			title = LOC "$$$/NggPlusPlus/ExportDialog/NggPlusPlus=Wordpress Login Details:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
-			
-			synopsis = bind { key = 'fullPath', object = propertyTable },
+			--title = LOC "$$$/NggPlusPlus/ExportDialog/NggPlusPlus=Wordpress Login Details:",
+			title = "Wordpress Login Details:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
 			
 				f:group_box {
 					title = "Login Settings",
@@ -76,11 +66,11 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							fill_horizontal = 1
 						}
 					},
+				},	
 
+				f:group_box {
+					title = "Settings for First-Sync with Wordpress",
 					f:row {
-						--f:spacer {
-						--	width = share 'labelWidth'
-						--},
 		
 						f:checkbox {
 							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Do local Copy:",
@@ -131,6 +121,69 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						},
 					},
 
+					
+
+				},
+
+				f:group_box {
+					title = "Select Values-Settings for WP-Metadata",
+
+					f:column {
+						--place = 'overlapping',
+						--fill_horizontal = 1,
+						f:row {
+							f:static_text {
+								fill_horizontal = 0,
+								width_in_chars = 17,
+								title = 'WP-alt_text',
+							},
+							f:static_text {
+								fill_horizontal = 0,
+								width_in_chars = 17,
+								title = 'WP-description',
+							},
+							f:static_text {
+								fill_horizontal = 0,
+								width_in_chars = 17,
+								title = 'WP-caption',
+							},
+						},	
+
+						f:row {
+							f:simple_list {
+								height = 80,
+								width = 100,
+								allows_multiple_selection = false,
+								items = { {title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								value = bind 'WPalt',
+							},
+								
+
+							f:spacer {
+								width = 40
+							},
+
+							f:simple_list {
+								height = 80,
+								width = 100,
+								allows_multiple_selection = false,
+								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								value = bind 'WPdescr',
+							},
+
+							f:spacer {
+								width = 40
+							},	
+								
+							f:simple_list {
+								height = 80,
+								width = 100,
+								allows_multiple_selection = false,
+								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								value = bind 'WPcap',
+							},	
+						},
+					},		
 				},
 
 		},
@@ -179,6 +232,10 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
 	propertyTable:addObserver( 'localPath', updateExportStatus )
 
+	propertyTable:addObserver( 'WPalt', updateExportStatus )
+	propertyTable:addObserver( 'WPdescr', updateExportStatus )
+	propertyTable:addObserver( 'WPcap', updateExportStatus )
+
 	updateExportStatus( propertyTable )
 	
 end
@@ -203,7 +260,7 @@ function checkURL( propertyTable )
 	propertyTable.msgBox = str
 end
 
--- Hilfsfunktion für den ftp-Dialog: Eingabefeld mit einheitlichen Parametern
+-- Hilfsfunktion für den Dialog: Eingabefeld mit einheitlichen Parametern
 function EntryBox( f, title, bound)
 
 	local bind = LrView.bind

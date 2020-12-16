@@ -8,7 +8,6 @@ local LrTasks = import 'LrTasks'
 
 
 ----- Debug -----------
---logDebug = false
 require 'strict'
 require 'Logger'
 local DebugSync = logDebug
@@ -18,9 +17,8 @@ local inspect = require 'inspect'
 ----- Debug -----------
 
 ---------------------------------------------------------
-
+-- Write LR Metadata of photo to WP Mediacat via REST-API
 function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
-	-- Write LR Metadata of photo to WP Mediacat via REST-API
 	-- Parameters: wpid: Number evtl. auch String, aber dann zu Number wandelbar
 	-- photoMeta: Tabelle mit Metadaten als key-value-pair
 	-- publishSettings: Tabelle ähnlich den Lr-Lua-PublishSettings, hier aber kopiert, da Original nicht bereitsteht
@@ -45,79 +43,100 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	}
 	local result
 	local headers
-  
-	local function pre(n)
-	  -- suffix für url bestimmen je nach anzahl metadaten '?' oder '&'
-	  local str = ''
-	  if n == 0 then
-		str = '?'
-	  else
-		str = '&'
-	  end
-	  return str
-	end
-	
-	local char_to_hex = function(c)
-	  return string.format("%%%02X", string.byte(c))
-	end
-	
-	local function urlencode(url)
-	  if url == nil then
-		return
-	  end
-	  url = url:gsub("\n", "\r\n")
-	  url = url:gsub("([^%w ])", char_to_hex)
-	  url = url:gsub(" ", "+")
-	  return url
-	end
-  
+    
 	local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+	local WPalt = publishSettings['WPalt'][1]
+	local WPdescr = publishSettings['WPdescr'][1]
+	local WPcap = publishSettings['WPcap'][1]
+
 	
 	for k, v in pairs(photoMeta) do
+		
+	  -- LR Caption (caption)	
 	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
-      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
-      local str = 'alt_text=' .. v .. '&description=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
-      url = url .. pre(n) .. str
-      n = n + 1
-    end
-    
-	  if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
-      v = urlencode(v)
-      local str = 'gallery=' .. v
-      url = url .. pre(n) .. str
-      n = n + 1
-    end
-    
-	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
-      v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
-      local str = 'title=' .. v .. '&caption=' .. v -- schreibe caption in alt-tag und description, sonst kein Feld in LR vorhanden
-      url = url .. pre(n) .. str
-      n = n + 1
-    end
+		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
 
-    if k == 'sortorder' and v ~= '' and v ~= nil and v ~= 'nil' then -- hier wird nur eine Nummer als integer übergeben
-      v = urlencode( tostring(v))
-      local str = 'gallery_sort=' .. v
-      url = url .. pre(n) .. str
-      n = n + 1
-    end
+		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		if WPalt == 'LRcap' then
+			local str = 'alt_text=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPdescr == 'LRcap' then
+			local str = 'description=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPcap == 'LRcap' then
+			local str = 'caption=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+	  end
+	  
+	  -- LR Title
+	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+
+		local str = 'title=' .. v -- der Titel wird immer fix in den Titel geschrieben
+		url = url .. pre(n) .. str
+		n = n + 1
+
+		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		if WPalt == 'LRtit' then
+			local str = 'alt_text=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPdescr == 'LRtit' then
+			local str = 'description=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPcap == 'LRtit' then
+			local str = 'caption=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end		
+
+      end
+	  ---------------------------------
+	  
+	  if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
+		v = urlencode(v)
+		local str = 'gallery=' .. v
+		url = url .. pre(n) .. str
+		n = n + 1
+      end
+	
+	  if k == 'sortorder' and v ~= '' and v ~= nil and v ~= 'nil' then -- hier wird nur eine Nummer als integer übergeben
+		v = urlencode( tostring(v))
+		local str = 'gallery_sort=' .. v
+		url = url .. pre(n) .. str
+		n = n + 1
+	  end
     
 	end
   
 	if n>0 then
-	  result, headers = LrHttp.post( url, '', httphead )
+	  	result, headers = LrHttp.post( url, '', httphead )
     
-    if headers.status == 200 then -- der POST-Request wird in diesem Fall immer mit status = 200 beantwortet
-      success = true
-      Log('Wrote Meta to Rest: ' .. url)
-    else
-      success = false
-      Log('Could not write Meta to Rest: ' .. url)
-    end
+		if headers.status == 200 then -- der POST-Request wird in diesem Fall immer mit status = 200 beantwortet
+			success = true
+			Log('Wrote Meta to Rest: ' .. url)
+		else
+			success = false
+			Log('Could not write Meta to Rest: ' .. url)
+		end
 
 	else
-	  success = true
-	  Log('No Meta to update: ' .. url)
+		success = true
+		Log('No Meta to update: ' .. url)
 	end
   
 	return success

@@ -1,40 +1,14 @@
 ----- Debug -----------
---logDebug = false
-require 'strict'
-require 'Logger'
-local DebugSync = logDebug
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
-local inspect = require 'inspect'
 ----- Debug -----------
 
 local LrDate = import( 'LrDate' )
 
------------- helper functions --------------------------------------------
+
+------------ helper functions for LR to WP Plugin --------------------------------------------
+
+-- Returns the baseFilename, and Extension as 2 values
 function SplitFilename(strFilename)
-	-- Returns the baseFilename, and Extension as 2 values
 	return string.match(strFilename, "(.-)%.(%a+)")
-end
-
---replhyphen '-' with underscore '_' in string
-function replhyphen(filen)
-	
-	filen = filen:reverse()
-	local nfound = 0
-	local newstring = filen
-
-	for i = 1, filen:len() do
-	local letter = filen:sub(i,i ) 
-		if (letter == '-')  then
-			if (nfound > 0) then
-				newstring = newstring:sub(1,i-1) .. '_' .. newstring:sub(i+1,newstring:len())
-			end
-			nfound = nfound + 1
-		end
-	end
-
-	filen = newstring:reverse()
-	return filen
 end
 
 ---------------------- shorted if expressions ----------------------------------------------------------
@@ -66,8 +40,8 @@ function iso8601ToTime(dateTimeISO8601)
 									 iif(ifnil(tzone, '') == '', "local", tzone))
 end
 
+-- write csv-file data to path with given seperator sep
 function csvwrite(path, data, sep)
-	-- write csv-file data to path with given seperator sep
 	  sep = sep or ';'
 	  local file = assert(io.open(path, "w"))
 	  for i=1,#data do
@@ -83,10 +57,10 @@ function csvwrite(path, data, sep)
 		  file:write('\n')
 	  end
 	  file:close()
-  end
+end
 
+-- get filename of Path (the value after the last '/')  
 function getfile(path, sep)
-	-- get filename of Path (the value after the last '/')
 	local n
 	path, n = path:gsub('\\','/')
 	sep = sep or '/'
@@ -108,8 +82,9 @@ function getfile(path, sep)
 	return path
 end
 
+-- split string by given seperator
 function strsplit(string, sSeparator, nMax, bRegexp)
-	-- split string by given seperator
+	
     if sSeparator == '' then
         sSeparator = ','
     end
@@ -144,9 +119,9 @@ function strsplit(string, sSeparator, nMax, bRegexp)
 end
 
 ---------------------------------------------------------------------
+-- read sqlite3.exe result to table, result stored in *.txt, seperated by '|'
 function sqlread(path, sep, tonum, null)
-	-- read sqlite3.exe result to table, result stored in *.txt, seperated by '|'
-    tonum = tonum or true
+	tonum = tonum or true
     sep = sep or ','
     null = null or ''
     local csvFile = {}
@@ -170,7 +145,7 @@ function sqlread(path, sep, tonum, null)
 end
 
 -- source: https://stackoverflow.com/questions/34618946/lua-base64-encode
-    -- encoding
+-- encoding
 function encb64(data)
     local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
     return ((data:gsub('.', function(x) 
@@ -185,7 +160,7 @@ function encb64(data)
     end)..({ '', '==', '=' })[#data%3+1])
 end
 
-    -- decoding
+-- decoding
 function decb64(data)
     local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
     data = string.gsub(data, '[^'..b..'=]', '')
@@ -211,9 +186,8 @@ function mytonumber( value )
 end
 
 -- wird nach dem Aufrufen einer neuen Collection aufgerufen
+-- check wether new Collection name is OK or fullfills the requirements
 function checkfolder( proposedName )
-    LrMobdebug.on()
-    -- sanitize Collection: alle Sonderzeichen in '-', alle slashes in '/', slashes am Anfang und Ende löschen
     -- WP-StandardFolder nicht erlauben 
     -- WP erlaubt das: [a-zA-Z0-9\\/\\-_]*
     local first = string.sub(proposedName,1,1)
@@ -270,4 +244,35 @@ function checkfolder( proposedName )
     end
 
     return result
-  end
+end
+
+-- suffix für url bestimmen je nach anzahl metadaten '?' oder '&'
+function pre(n)
+    
+    local str = ''
+    if n == 0 then
+        str = '?'
+    else
+        str = '&'
+    end
+    return str
+end
+
+-- url encode bzw. sanitize für korrekten code im http-request
+function urlencode(url)
+    
+    local char_to_hex = function(c)
+        return string.format("%%%02X", string.byte(c))
+    end
+
+    if url == nil then
+        return
+    end
+
+    url = url:gsub("\n", "\r\n")
+    url = url:gsub("([^%w ])", char_to_hex)
+    url = url:gsub(" ", "+")
+
+    return url
+
+end
