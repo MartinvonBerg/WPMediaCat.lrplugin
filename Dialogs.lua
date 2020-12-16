@@ -24,8 +24,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 	local result = {
 	
 		{
-			--title = LOC "$$$/NggPlusPlus/ExportDialog/NggPlusPlus=Wordpress Login Details:",
-			title = "Wordpress Login Details:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
+			title = "Wordpress Login Details and Settings:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
 			
 				f:group_box {
 					title = "Login Settings",

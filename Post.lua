@@ -5,13 +5,10 @@ by Martin von Berg
 ]]
 
 ------------- Debug ----------------------
-
---local Require = require "Require".path ("../debuggingtoolkit.lrdevplugin").reload ()
---local Debug = require "Debug".init ()
 require 'strict.lua'
 local inspect = require 'inspect'
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 
 ----------------------------------------
 
@@ -21,9 +18,9 @@ local LrHttp = import( 'LrHttp' )
 function CheckLogin( publishSettings ) 
 
 	Log('Debug: ' .. tostring(logDebug))
-	LrMobdebug.on()
+	
 	local ReturnTable = {} 
-	--local hash = 'Basic ' .. publishSettings.hash 
+	 
 	publishSettings.hash = ''
 	local uid = publishSettings.loginName
 	local pwd = publishSettings.loginPassword
@@ -71,18 +68,20 @@ function CheckLogin( publishSettings )
 		
 		if headers.status == 200 then
 			local str = inspect(result) -- JSON-Rückgabe für ein Image in str umwandeln
-			local i,j = string.find(result,'wp_wpcat_json_rest') 
+			local i,j = string.find(result,'wpcat_json_rest') 
 			local pluginstatus
 			local pluginversion
 
 			if i ~= nil then
 				result = JSON:decode(result) 
 				for k = 1, #result do
-					if result[k]['textdomain'] == "wp_wpcat_json_rest" then
+					local m,n = string.find(result[k]['textdomain'],'wpcat_json_rest')
+					if m~= nil then
 						pluginstatus = result[k]['status']
 						pluginversion = result[k]['version']
 					end
 				end
+
 				if pluginstatus == 'active' then
 					ReturnTable['plugin'] = 'OK. Wordpress Plugin installed and active. Version: ' .. tostring(pluginversion)
 					publishSettings.wpplugin = true
@@ -90,6 +89,7 @@ function CheckLogin( publishSettings )
 					ReturnTable['plugin'] = 'OK. Wordpress Plugin installed but not activated! Version: ' .. tostring(pluginversion)
 					publishSettings.wpplugin = false
 				end
+
 			else
 				ReturnTable['plugin'] = 'Plugin not installed. Many functions won\'t work!'
 				publishSettings.wpplugin = false

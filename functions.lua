@@ -217,7 +217,7 @@ end
 -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
 function WriteCustomMetaData( publishSettings, photo, restmetadata )
 	 -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
-	LrMobdebug.on()
+	
 	local i = 1
 	local foundph = {}
 	foundph[i] =  restmetadata
@@ -248,7 +248,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
 	photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
 end
   
-  -- Add Media File to WP-Media-Catalog via REST-API
+  -- Add Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
 	-- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
 	-- Auch mit FTP wird nicht mehr hochgeladen. NIE!
@@ -257,7 +257,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	-- Bei GET: Liefert alle WPIDs zu allen Original-Files im Folder. Zusätzlich werden alle Dateien, die nicht in WP sind gelistet als eigener Key in der REST-Antwort
 	-- Bei POST mit addtofolder, wird mit dem JPG-Body das WP-Bild mit WPID entweder updated oder ohne WPID die bestehende JPG-Datei überschrieben und dann zu WP ergänzt
 	-- In beiden Fällen bei POST wird die WPID als ID zurückgeliefert und der Ablauf in LR-LUA in dieser Funktion kann gleichbleiben! 
-	LrMobdebug.on()
+	
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local wpid = 0
@@ -319,9 +319,9 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
   
 	Log('Added Media: ', wpid)
 	return wpid, restData
-  end
+end
   
--- Update Media File to WP-Media-Catalog via REST-API
+-- Update Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
 function UpdateMedia( publishSettings, filename, path, wpid ) 
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
@@ -355,11 +355,10 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 end
   
 -- Get all Media Files / one Medie File from WP-Media-Catalog via REST-API. Provide response as JSON
--- TODO : Authorization-Auswahl im Menu mit Vorauswahl im Dropdown, OAuth2-Plugin mit base64 verwenden, hash nach LR kopieren
 -- param: page : wenn nicht angegeben, dann muss perpage eine wpid sein!
--- param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
+-- TODO use param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
 function GetMedia( publishSettings, perpage, page ) 
-  LrMobdebug.on()
+  
 	local result = nil
 	if publishSettings == {} or publishSettings == nil then
 	  return result
