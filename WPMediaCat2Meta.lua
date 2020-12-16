@@ -12,6 +12,5 @@ return {
      { version = 8, dataType="string", searchable=true, browsable=true, readOnly=false, id="slug", title="Slug"  },
      { version = 8, dataType="url", searchable=true, browsable=true, readOnly=false, id="post", title="Post"  },
      { version = 8, dataType="string", searchable=true, browsable=true, readOnly=false, id="gallery", title="Gallery"  },
-     --{ version = 8, dataType="string", searchable=false, browsable=false, readOnly=false, id="order", title="Sort-Order"  }, 
     }
    }

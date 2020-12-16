@@ -391,7 +391,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 5 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -519,8 +519,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
           if #sqltab >= 1 then -- einmal gefunden
             lrid = sqltab[1][1] 
           end
-          --if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-          --lrid = tonumber(lrid)
           if lrid ~= nil then
             Log('M I   : ' .. filen .. ' ID = ' .. inspect(sqltab))
           end
@@ -571,14 +569,16 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             
             if base ~= nil then
               success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .. "%'\" > " .. p .. "/test.txt") 
-              lrid = LrFileUtils.readFile( p ..'/test.txt' )
-              if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-              lrid = tonumber(lrid)
+              local sqltab = {}
+              sqltab = sqlread( p .. "/test.txt", '|')
+              if #sqltab >= 1 then -- einmal gefunden
+                lrid = sqltab[1][1] 
+              end
 
               if lrid ~= nil then
                 base = string.gsub( base,"_"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
                 searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
-                Log('M III : ' .. base .. ' ID = ' .. inspect(lrid))
+                Log('M III : ' .. base .. ' ID = ' .. inspect(sqltab))
               end
 
             end
@@ -601,11 +601,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               if #sqltab > 0 then -- einmal gefunden
                 lrid = sqltab[1][1] 
               end
-              --lrid = LrFileUtils.readFile( p ..'/test.txt' ) 
-              --if #lrid > 9 then lrid = string.sub(lrid,1,7) end
-              --lrid = tonumber(lrid)
-              
-
+           
               if lrid ~= nil then
                   success = LrTasks.execute( sqcat1 .. " \"select baseName from AgLibraryFile where id_local like '" .. lrid .. "%'\" > " .. p .. "/test.txt")
                   base = LrFileUtils.readFile( p ..'/test.txt' ) 
@@ -695,11 +691,12 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       for nn=1,#notfound do
         if notfound[nn].mime == 'image/jpeg' or notfound[nn].mime == 'image/png' then
           local newfilepath = copypath .. '\\' .. notfound[nn].filen
+          -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
 
             local newlrphoto = nil
             Log('ADD-2-CAT: ' .. notfound[nn].origurl .. ' -> ' .. newfilepath)
-            --- AsyncTask
+            --- AsyncTask zum herunterladen
             LrTasks.startAsyncTask(function ()
               local httphead = {
                 {field='Content-Type', value=notfound[nn].mime}, --- noch für png und gif erweitern
@@ -717,6 +714,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               LrTasks.sleep(10)
             end
           
+            -- bild erfolgreich heruntergeladen
             if LrFileUtils.exists( newfilepath ) == 'file' then
               catalog:withWriteAccessDo( 'AddNewPhoto', function ()
                 newlrphoto = catalog:addPhoto( newfilepath )
@@ -734,7 +732,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         end -- if mime-type 
       end -- for
 
-    end -- copyfile trie
+    end -- copyfile 
 
     
     -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
@@ -783,6 +781,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     -- Metadaten wie auch bei den gefundenen Fotos setzen
   
   end -- if firtsync
+
   pscope:done()
 end -- function
 
