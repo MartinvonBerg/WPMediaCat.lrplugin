@@ -204,7 +204,11 @@ function updateExportStatus( propertyTable )
 			locp = ''
 			locp = propertyTable.localPath 
 		end
-		
+
+		propertyTable.WPalt = 'LRcap'
+  		propertyTable.WPdescr = 'LRcap'
+  		propertyTable.WPcap = 'LRtit'
+	
 	until true
 	
 	if message then

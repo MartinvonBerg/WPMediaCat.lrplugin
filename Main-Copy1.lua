@@ -841,7 +841,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   --logDebug = publishSettings.DebugMode
   Log('getCollectionBehaviorInfo call')
   Log('WP-Plugin installed: ', publishSettings.wpplugin)
-  Log('WPalt : ' .. publishSettings.WPalt[1] .. '  WPdescr = ' .. publishSettings.WPdescr[1] .. '  WPcap = ' .. publishSettings.WPcap[1] )
+  Log('WPalt : ' .. inspect(publishSettings.WPalt[1]) .. '  WPdescr = ' .. inspect(publishSettings.WPdescr[1]) .. '  WPcap = ' .. inspect(publishSettings.WPcap[1]) )
 
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
