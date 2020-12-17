@@ -240,8 +240,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           renderedPhoto[i][1] = photo
           renderedPhoto[i][2] = ImageID -- remoteID
           renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
-          rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
           rendition:recordPublishedPhotoId( ImageID )  
+          rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
               
       elseif tonumber(wpid) == 0 then -- add new image to WP Media Catalog
           if progressScope:isCanceled() then progressScope:cancel() end 
@@ -261,12 +261,12 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
             end )
 
-            rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
             renderedPhoto[i] = {}
             renderedPhoto[i][1] = photo   -- catalog photo
             renderedPhoto[i][2] = ImageID -- remoteID
             renderedPhoto[i][3] = exportContext.publishedCollection.localIdentifier
             rendition:recordPublishedPhotoId( ImageID )
+            rendition:recordPublishedPhotoUrl(tostring(exportContext.publishedCollection.localIdentifier))
             
           else
             LrDialogs.showError( result)
@@ -359,11 +359,12 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     --TODO: exportContext.propertyTable.firstsync = true
   end
   
-  -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen
+  -- Nur bei Firstsync also wenn die Collection leer ist
   if (firstsync == true and publishSettings.urlreadable == true) then
     Log('Start First Sync')
     pscope:setPortionComplete(0.05)
 
+    -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen  
     while getmore == true
     do
       Log('Start While')
@@ -400,7 +401,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     
     Log('End While')
     --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
-    pscope:setPortionComplete(0.2)
+    pscope:setPortionComplete(0.15)
 
     -- Suche die Fotos im lokalen LR-Catalog (Eigentlich eine Vorsuche zur Bestimmung der Suchmethode)
     local foundph = {}
@@ -412,7 +413,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     local npaths = 1
     local sub
     local Level1 = {}
-    local pscopeadd = (0.65 - 0.2) / #mediatable
+    local pscopeadd = (0.2 - 0.15) / #mediatable
 
     ----------------------------------------------------------
     -- Suchlauf für alle Dateien : Pfade bestimmen
@@ -458,7 +459,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
         mediatable[i]['path'] = sub
         -----------------------------------------
         if pscope:isCanceled() then pscope:cancel() end
-        pscope:setPortionComplete(0.2 + i * pscopeadd)
+        pscope:setPortionComplete(0.15 + i * pscopeadd)
 
     end
 
@@ -496,25 +497,22 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
 
     if pscope:isCanceled() then pscope:cancel() end
-    pscope:setPortionComplete(0.33)
+    pscope:setPortionComplete(0.2)
 
-    
     
     -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
     addToWPColl(collection, searchDesc, mediatable, Level1, paths) 
     ------------------------------------------------------------------------
 
-    LrTasks.sleep(#mediatable*0.3) -- necessary to wait for async process
+    local pscopeadd = (0.6 - 0.2) / (#mediatable +1)
+    for wait=1, #mediatable do
+      LrTasks.sleep(0.3) -- necessary to wait for async process pscope 0,4
+      pscope:setPortionComplete(0.2 + wait * pscopeadd)
+    end
     --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-    pscope:setPortionComplete(0.66)
+    pscope:setPortionComplete(0.6)
     if pscope:isCanceled() then pscope:cancel() end
 
-     --if #photos = 0 and copyfile then
-            -- download add to cat
-            -- get lrid = {}
-          --end
-          -- wait
-    --[[
     -- nicht gefundene Photos herunterladen und zum Katalog eränzen
     local copyfile = publishSettings.doLocalCopy
     local copypath = publishSettings.localPath
@@ -526,23 +524,27 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       if not _exists then
         LrFileUtils.createDirectory( copypath )
       end
+      Log('Start download of unknown Photos.')
 
       -- fotos herunterladen
-      for nn=1,#notfound do
-        if notfound[nn].mime == 'image/jpeg' or notfound[nn].mime == 'image/png' then
-          local newfilepath = copypath .. '\\' .. notfound[nn].filen
+      for nn=1,#mediatable do
+        local photos = mediatable[nn].lrid
+      
+        if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png') and #photos == 0 then
+          local newfilepath = copypath .. '\\' .. mediatable[nn].filen
           -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
 
             local newlrphoto = nil
-            Log('ADD-2-CAT: ' .. notfound[nn].origurl .. ' -> ' .. newfilepath)
+            Log('ADD-2-CAT: ' .. mediatable[nn].origurl .. ' -> ' .. newfilepath)
+            
             --- AsyncTask zum herunterladen
             LrTasks.startAsyncTask(function ()
               local httphead = {
-                {field='Content-Type', value=notfound[nn].mime}, --- noch für png und gif erweitern
+                {field='Content-Type', value=mediatable[nn].mime}, --- noch für png und gif erweitern
                 {field='Application', value='application/octet-stream'},
                 }
-              local newfilecontent, headers =LrHttp.get(notfound[nn].origurl)
+              local newfilecontent, headers =LrHttp.get(mediatable[nn].origurl)
               local file = assert(io.open(newfilepath, "wb"))
               file:write(newfilecontent)
               file:close()
@@ -561,21 +563,17 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               end )
               
               -- lrphoto and foundph anhängen. lrid = lrphoto setzen
-              notfound[nn].lrid = {newlrphoto}
-              foundph[#foundph +1] = notfound[nn]
-              nfound = nfound +1
-              searchDesc[#searchDesc +1] = {}
+              mediatable[nn].lrid = {newlrphoto}
             end
             
           end -- if not exists
           
         end -- if mime-type 
       end -- for
-
     end -- copyfile 
-    ]]      
-        
+            
     -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
+    local pscopeadd = (0.95 - 0.7) / (#mediatable +1)
     catalog:withWriteAccessDo( 'AddMetaData', function () 
       for i=1, #mediatable do
           local photos = mediatable[i].lrid
@@ -600,23 +598,24 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
               WriteCustomMetaData( publishSettings, photo, mediatable[i]) 
             end
           end
-
+          pscope:setPortionComplete(0.7 + i * pscopeadd)
       end 
     end ) -- catalog:withWriteAccessDo
     
+    pscope:setPortionComplete(0.95)
+
     -- Write csv-File with not found Photos
-    --[[
     if not copyfile then
-      for i=1,#foundph do
-        if foundph[i].lrid[1] == nil then
-          table.insert(notfound,foundph[i])
+      for i=1,#mediatable do
+        local photos = mediatable[i].lrid
+        if #photos == 0 then
+          table.insert(notfound,mediatable[i])
           nnotfound = nnotfound +1
         end
       end
       local p2 = LrPathUtils.getStandardFilePath( 'documents' )
       csvwrite(p2 .. '/notfound.csv',notfound, ';') 
     end
-    ]]
 
     pscope:done()
     --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
