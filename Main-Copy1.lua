@@ -344,7 +344,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
 
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
-    perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
+    perpage = 30 -- Anzahl der Media-Einträge per REST-Abfrage
   else
     perpage = 100 -- Anzahl der Media-Einträge per REST-Abfrage
   end
@@ -362,6 +362,8 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   -- Alle Fotos mit REST-Api aus dem WP-Media-Catalog auslesen
   if (firstsync == true and publishSettings.urlreadable == true) then
     Log('Start First Sync')
+    pscope:setPortionComplete(0.05)
+
     while getmore == true
     do
       Log('Start While')
@@ -397,7 +399,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
     
     Log('End While')
-    LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
+    --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
     pscope:setPortionComplete(0.2)
 
     -- Suche die Fotos im lokalen LR-Catalog (Eigentlich eine Vorsuche zur Bestimmung der Suchmethode)
@@ -411,8 +413,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     local sub
     local Level1 = {}
     local pscopeadd = (0.65 - 0.2) / #mediatable
-    --local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
-    --Log('Use Cat: ' .. sqcat1)
 
     ----------------------------------------------------------
     -- Suchlauf für alle Dateien : Pfade bestimmen
@@ -496,8 +496,24 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
 
     if pscope:isCanceled() then pscope:cancel() end
-    pscope:setPortionComplete(0.65)
+    pscope:setPortionComplete(0.33)
 
+    
+    
+    -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
+    addToWPColl(collection, searchDesc, mediatable, Level1, paths) 
+    ------------------------------------------------------------------------
+
+    LrTasks.sleep(#mediatable*0.3) -- necessary to wait for async process
+    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+    pscope:setPortionComplete(0.66)
+    if pscope:isCanceled() then pscope:cancel() end
+
+     --if #photos = 0 and copyfile then
+            -- download add to cat
+            -- get lrid = {}
+          --end
+          -- wait
     --[[
     -- nicht gefundene Photos herunterladen und zum Katalog eränzen
     local copyfile = publishSettings.doLocalCopy
@@ -557,29 +573,34 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       end -- for
 
     end -- copyfile 
-    ]]
-    
-    -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
-    addToWPColl(collection, searchDesc, mediatable, Level1, paths) 
-    ------------------------------------------------------------------------
-
-    LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
-    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
-    pscope:setPortionComplete(0.8)
-    if pscope:isCanceled() then pscope:cancel() end
+    ]]      
         
     -- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
     catalog:withWriteAccessDo( 'AddMetaData', function () 
-      for i=1, nfound-1 do
-          if i > #foundph then
-            break
+      for i=1, #mediatable do
+          local photos = mediatable[i].lrid
+
+          if #photos > 0 then
+            -- Collection bestimmen
+            local new_collection
+            local path = mediatable[i]['path']
+            local index = 0
+                
+            index = findValueInArray(paths, path)
+
+            if index > 0 then
+              new_collection = Level1[index]
+            else
+              new_collection = collection
+            end
+
+            new_collection:addPhotos(photos) -- richtige collection bestimmen
+                            
+            for j, photo in ipairs(photos) do
+              WriteCustomMetaData( publishSettings, photo, mediatable[i]) 
+            end
           end
-          local photos = foundph[i].lrid
-                  
-          for j, photo in ipairs(photos) do
-            WriteCustomMetaData( publishSettings, photo, foundph[i])
-          end
-        
+
       end 
     end ) -- catalog:withWriteAccessDo
     
@@ -598,7 +619,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     ]]
 
     pscope:done()
-    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
   
   end -- if firtsync
 

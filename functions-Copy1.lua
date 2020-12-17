@@ -436,96 +436,154 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 		local str =inspect(all_paths)
 		Log('Paths in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
-		local len = #photos
 		local selphoto
-		--local lrid
-		local specialsearch = false
+		local specialsearch = true
+		local lrid = {}
 			
-		for i=1,len do
+		for i=1, #photos do
 
 			local filen = photos[i].filen
-			local base, ext = SplitFilename(filen)
-			---- M I : --------------------------
-			local lrid = catalog:findPhotos {
-				searchDesc = {
-					{
-						criteria = "copyname",
-						operation = "any",
-						value = base,
-						value2 = "",
-					},
-					{
-						criteria = "filename",
-						operation = "noneOf",
-						value = base,
-						value2 = "",
-					},
-					combine = "intersect",
-				},
-			}
+			local base = ''
+			local ext = ''
+			photos[i].lrid = {}
 
-			--------- Auswahl bei mehr als einem gefundenen Foto
-			if lrid[2] ~= nil and specialsearch then
-				local label = {} 
-				local sel = 0
-				local nred = 0
-				local csel = 0
-				local ncol = 0
-				local coll = {}
-				local pubcoll = {}
-				
-				for k, ph in ipairs(lrid) do
-				label[k] = ph:getFormattedMetadata('label')
-				if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
-					sel = k
-					nred = nred +1
-				end
-				coll[k] = ph:getContainedCollections()
-				pubcoll[k] = ph:getContainedPublishedCollections()
-				if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
-					csel = k
-					ncol = ncol +1
-				end
-				
-				end
-				
-				if nred == 1 then
-				selphoto = {lrid[sel]}
-				lrid = selphoto
-				elseif ncol == 1 then
-				selphoto = {lrid[csel]}
-				lrid = selphoto
-				end
-				
-			end
-			
-			photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
-			----------------------------
-			
-	
-
-			-- Collection bestimmen
-			local new_collection
-			local path = photos[i]['path']
-			local index = 0
-					
-			index = findValueInArray(all_paths, path)
-			if index > 0 then
-				new_collection = all_collections[index]
+			if filen == nil or filen == 'nil' then 
+				local str = inspect(photos[i])
+				Log('Filename nicht definiert. Nr : ' .. i .. str)
 			else
-				new_collection = collection
+				base, ext = SplitFilename(filen)
 			end
 
-			local name = new_collection:getCollectionInfoSummary()['name']
-			--Log(path .. '=' .. name)
-			Log(photos[i].filen   .. '; N lrid = ;' .. #lrid .. '; Coll ; '.. name)	
+			if ext == 'gif' or ext == 'GIF' or ext == '' or filen == nil or filen == 'nil' then
+					-- do nothing : skip	
+			else 
+				---- M I : search virt. Copy --------------------------
+				lrid = catalog:findPhotos {
+					searchDesc = {
+						{
+							criteria = "copyname",
+							operation = "any",
+							value = base,
+							value2 = "",
+						},
+						{
+							criteria = "filename",
+							operation = "noneOf",
+							value = base,
+							value2 = "",
+						},
+						combine = "intersect",
+					},
+				}
 
-			if #lrid > 0 then
-				catalog:withWriteAccessDo( 'AddtoWP', function () 
-						new_collection:addPhotos(lrid)
-				end ) 
+				---- M II : search basename with wildcard --------------------------
+				if #lrid == 0 then
+					base = string.gsub( base,"[-_]"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
+					--base = string.gsub( base,"_"," ")
+
+					lrid = catalog:findPhotos {
+						searchDesc = {
+							{
+								criteria = "filename",
+								operation = "all",
+								value = base,
+							},
+							{
+								criteria = "copyname",
+								operation = "noneOf",
+								value = base,
+							},
+							combine = "intersect",
+						},
+					}
+
+					if #lrid > 1 then
+						local newlrid = {}
+
+						for k, photo in ipairs(lrid) do
+							local lrfilename = photo:getFormattedMetadata( 'fileName' )
+							local base4search = '^' .. string.gsub( base," ","[-_]") .. '%.'
+							local result = string.match(lrfilename, base4search)
+							if result ~= nil then
+								Log('  ' .. inspect(lrfilename) .. '  ' .. inspect(base4search) ..'  ' .. inspect(result))
+								--table.insert(newlrid, photo)
+								newlrid[ #newlrid +1 ] = photo
+							end
+						end
+
+						lrid = newlrid
+
+					end
+
+				end
+
+				--------- Auswahl bei mehr als einem gefundenen Foto
+				if lrid[2] ~= nil and specialsearch then
+					local label = {} 
+					local sel = 0
+					local nred = 0
+					local csel = 0
+					local ncol = 0
+					local coll = {}
+					local pubcoll = {}
+					
+					for k, ph in ipairs(lrid) do
+					label[k] = ph:getFormattedMetadata('label')
+					if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
+						sel = k
+						nred = nred +1
+					end
+					coll[k] = ph:getContainedCollections()
+					pubcoll[k] = ph:getContainedPublishedCollections()
+					if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
+						csel = k
+						ncol = ncol +1
+					end
+					
+					end
+					
+					if nred == 1 then
+					selphoto = {lrid[sel]}
+					lrid = selphoto
+					elseif ncol == 1 then
+					selphoto = {lrid[csel]}
+					lrid = selphoto
+					end
+					
+				end
+				
+				if #lrid > 0 then
+					photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+				end
+				----------------------------
+				
+				-- Collection bestimmen
+				local new_collection
+				local path = photos[i]['path']
+				local index = 0
+						
+				index = findValueInArray(all_paths, path)
+				if index > 0 then
+					new_collection = all_collections[index]
+				else
+					new_collection = collection
+				end
+
+				local name = new_collection:getCollectionInfoSummary()['name']
+				--Log(path .. '=' .. name)
+				Log(photos[i].filen .. '; --> ; ' .. base .. '; N lrid = ;' .. #lrid .. '; Coll ; '.. name)	
+
+				--[[
+				if #lrid > 0 then
+					catalog:withWriteAccessDo( 'AddtoWP', function () 
+							new_collection:addPhotos(lrid)
+					end ) 
+				end
+				]]
 			end
-		end
+
+		end -- end for photos
+		
 	end )
 
 end
