@@ -1,0 +1,580 @@
+-- special helper functions for the LR-SDK-API
+---
+local LrApplication = import( 'LrApplication' )
+local LrFileUtils = import 'LrFileUtils'
+local LrHttp = import 'LrHttp'
+local LrDate = import 'LrDate'
+local LrTasks = import 'LrTasks'
+
+
+----- Debug -----------
+require 'strict'
+require 'Logger'
+local DebugSync = logDebug
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
+local inspect = require 'inspect'
+----- Debug -----------
+
+---------------------------------------------------------
+-- Write LR Metadata of photo to WP Mediacat via REST-API
+function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
+	-- Parameters: wpid: Number evtl. auch String, aber dann zu Number wandelbar
+	-- photoMeta: Tabelle mit Metadaten als key-value-pair
+	-- publishSettings: Tabelle ähnlich den Lr-Lua-PublishSettings, hier aber kopiert, da Original nicht bereitsteht
+	-- LR caption kommt in den alt-tag und in die Beschreibung bzw. description.raw 
+	-- alt-tag leerlassen, wenn das Bild als dekoratives Element dient!
+  
+	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
+	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
+	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
+	LrMobdebug.on()  
+	local success = false
+  
+	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
+	  Log('WritephotoMetaToWp failed')
+	  return success
+	end
+  
+	local n = 0
+	local hash = 'Basic ' .. publishSettings['hash']
+	local httphead = {
+		{field='Authorization', value=hash},
+	}
+	local result
+	local headers
+    
+	local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+	local WPalt = publishSettings['WPalt'][1]
+	local WPdescr = publishSettings['WPdescr'][1]
+	local WPcap = publishSettings['WPcap'][1]
+
+	
+	for k, v in pairs(photoMeta) do
+		
+	  -- LR Caption (caption)	
+	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+
+		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		if WPalt == 'LRcap' then
+			local str = 'alt_text=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPdescr == 'LRcap' then
+			local str = 'description=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPcap == 'LRcap' then
+			local str = 'caption=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+	  end
+	  
+	  -- LR Title
+	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
+
+		local str = 'title=' .. v -- der Titel wird immer fix in den Titel geschrieben
+		url = url .. pre(n) .. str
+		n = n + 1
+
+		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		if WPalt == 'LRtit' then
+			local str = 'alt_text=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPdescr == 'LRtit' then
+			local str = 'description=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end
+
+		if WPcap == 'LRtit' then
+			local str = 'caption=' .. v
+			url = url .. pre(n) .. str
+			n = n + 1
+		end		
+
+      end
+	  ---------------------------------
+	  
+	  if k == 'gallery' and v ~= '' and v ~= nil and v ~= 'nil' then
+		v = urlencode(v)
+		local str = 'gallery=' .. v
+		url = url .. pre(n) .. str
+		n = n + 1
+      end
+	
+	  if k == 'sortorder' and v ~= '' and v ~= nil and v ~= 'nil' then -- hier wird nur eine Nummer als integer übergeben
+		v = urlencode( tostring(v))
+		local str = 'gallery_sort=' .. v
+		url = url .. pre(n) .. str
+		n = n + 1
+	  end
+    
+	end
+  
+	if n>0 then
+	  	result, headers = LrHttp.post( url, '', httphead )
+    
+		if headers.status == 200 then -- der POST-Request wird in diesem Fall immer mit status = 200 beantwortet
+			success = true
+			Log('Wrote Meta to Rest: ' .. url)
+		else
+			success = false
+			Log('Could not write Meta to Rest: ' .. url)
+		end
+
+	else
+		success = true
+		Log('No Meta to update: ' .. url)
+	end
+  
+	return success
+  
+end
+ 
+-- REST JSON array with keys
+function ExtractDataFromREST( restdata )
+	-- aus einer REST-Antwort zu einer Datei die Daten für customMetadata extrahieren
+	-- Parameter restdata: JSON-Format der REST-Antwort. liefert array zurück
+	local i = 1
+	local result = {} 
+	result[i] = restdata
+	local row = {}
+  	local lrid, fname, n
+  
+	if restdata == nil or restdata == '' or restdata == 'nil' or restdata == {} or result[i].media_type == 'file' or result[i].mime_type == "image/x-icon"  then -- mime_type = \"image/x-icon\"
+		return row
+	end
+  
+	local str = inspect(result[i]) -- JSON-Rückgabe für ein Image in str umwandeln
+	local ii,j = string.find(str,'original_image') -- den vollen Filename suchen
+	if ii ~= nil then
+	  fname = result[i].media_details.original_image
+	else
+	  fname = result[i].media_details.file
+	  if fname == nil or fname == 'nil' then Log(str) 
+	  else
+	  fname = getfile(fname)
+	  fname, n = fname:gsub('-scaled','')
+	  end
+	end
+	
+	local function findTextinHTML( html )
+	  -- find text in HTML-Tag from REST-Api-Data
+	  -- Parameter: html : string
+	  local w1, w2, text
+	  w1, w2 = string.find(html, '<p>.*</p>')
+	  if w1 ~=nil and w2 ~= nil then
+		text = string.sub(html,w1+3,w2-4)
+	  else
+		text = ''
+	  end
+	  return text
+	end
+  
+	local _descr = result[i].description.rendered  
+	_descr = findTextinHTML(_descr)
+  
+	local _caption = result[i].caption.rendered
+	_caption = findTextinHTML(_caption)
+  
+  row = { lrid = {}, 
+          id = result[i].id, 
+          upldate = result[i].date, 
+          width = result[i].media_details.width, 
+          height = result[i].media_details.height, 
+          slug = result[i].slug, 
+          post = result[i].post, 
+          gallery = result[i].gallery, 
+          phurl = result[i].source_url, 
+          filen = fname,
+		  datemod = result[i].modified, 
+		  datecreated = result[i].media_details.image_meta.created_timestamp,
+          title = result[i].title.rendered,
+          descr = _descr,  
+          caption = _caption,
+          alt  = result[i].alt_text, 
+		  origfile = fname, 
+		  origurl = result[i].guid.rendered,
+		  MD5 =  result[i].md5_original_file, -- table contains MD5 und filesize of fname on server
+		  mime = result[i].mime_type,
+		  } 
+   
+	return row
+end
+  
+-- Write extracted Rest-meta-Data to customMetadata in Lightroom Catalog
+function WriteCustomMetaData( publishSettings, photo, restmetadata )
+	 -- Achung: muss innerhalb von catalog:withWriteAccessDo('unique-ID', function () ... end) aufgerufen werden
+	
+	local i = 1
+	local foundph = {}
+	foundph[i] =  restmetadata
+  
+	local date = tostring(foundph[i].upldate)
+	date = iso8601ToTime(date)
+	local dateday = LrDate.formatShortDate(date)
+	local datetime = LrDate.formatMediumTime( date )
+	local url = publishSettings['siteURL'] or publishSettings.siteURL
+	
+	photo:setPropertyForPlugin( _PLUGIN, 'wpid', tostring(foundph[i].id) )
+	photo:setPropertyForPlugin( _PLUGIN,'upldate', dateday .. " / " .. datetime)
+	photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(foundph[i].width))
+	photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(foundph[i].height))
+	photo:setPropertyForPlugin( _PLUGIN,'slug', tostring(foundph[i].slug))
+	photo:setPropertyForPlugin( _PLUGIN,'gallery', tostring(foundph[i].gallery) )
+  
+	if mytonumber(foundph[i].post) ~= 'nil' then
+	  photo:setPropertyForPlugin( _PLUGIN,'post', url .. "/?p=" .. tostring(foundph[i].post)) -- 
+	else
+	  photo:setPropertyForPlugin( _PLUGIN,'post', '')
+	end
+  
+	--photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', tostring(foundph[i].phurl))
+	-- set to: http://127.0.0.1/wordpress/wp-admin/post.php?post=4522&action=edit
+	--                https://www.mvb1.de/wp-admin/post.php?post=4884&action=edit
+	url = url .. '/wp-admin/post.php?post=' .. tostring(foundph[i].id) .. '&action=edit'
+	photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
+end
+  
+  -- Add Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
+function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
+	-- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
+	-- Auch mit FTP wird nicht mehr hochgeladen. NIE!
+	-- Nur dann, KANN es keine Dateien geben, die zwar im Folder sind aber noch nicht in WP sind oder LR nicht zugeordnet wurden, d.h. WP und LR sind dann immer synchron.
+	-- Wenn das geünscht wird, muss im WP-Plugin die Funktion bei der Route 'addtofolder' erweitert werden
+	-- Bei GET: Liefert alle WPIDs zu allen Original-Files im Folder. Zusätzlich werden alle Dateien, die nicht in WP sind gelistet als eigener Key in der REST-Antwort
+	-- Bei POST mit addtofolder, wird mit dem JPG-Body das WP-Bild mit WPID entweder updated oder ohne WPID die bestehende JPG-Datei überschrieben und dann zu WP ergänzt
+	-- In beiden Fällen bei POST wird die WPID als ID zurückgeliefert und der Ablauf in LR-LUA in dieser Funktion kann gleichbleiben! 
+	
+	local hash = 'Basic ' .. publishSettings['hash']
+	local filen = filename
+	local wpid = 0
+	local restData = {}
+	local url = ''
+	local httphead
+  
+	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
+	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+	  return wpid, restData
+	end
+  
+	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+  
+	-- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
+	if defaultcoll then  
+	  url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
+	  httphead = {
+		{field='Authorization', value=hash},
+		{field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
+		{field='Content-Type', value='image/jpeg'},
+	  }
+	elseif folder ~= '' then
+	  --Header-Wert: Content-Disposition = attachment; filename=example.jpg OHNE Anführungszeichen!
+	  url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/addtofolder/" .. folder
+	  httphead = {
+		{field='Authorization', value=hash},
+		{field='Content-Disposition', value='attachment; filename=' .. filen},
+		{field='Content-Type', value='image/jpeg'},
+	  }
+	else
+	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+	  return wpid, restData
+	end
+  
+	-- Create the image in Wordpress via REST-API according to the above settings
+	local result, headers = LrHttp.post( url, imgfile, httphead )
+	result = JSON:decode(result)
+  
+	-- Extract data from the Response to the Create-Request
+	  if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
+		wpid = tonumber(result['id'])
+		restData = ExtractDataFromREST(result)
+  
+	elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
+		wpid = tonumber(result['id'])
+		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
+		local httphead = {
+		  {field='Authorization', value=hash}        
+		}
+		local result, headers = LrHttp.get( url, httphead )
+		result = JSON:decode(result)
+		restData = ExtractDataFromREST(result)
+  
+	else
+		wpid = 'Upload: Fault during upload to WP: ' .. filen .. '.\nHeader-Status: ' .. tostring(headers.status) .. '\nMessage: ' .. result['message']
+	end
+  
+	Log('Added Media: ', wpid)
+	return wpid, restData
+end
+  
+-- Update Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
+function UpdateMedia( publishSettings, filename, path, wpid ) 
+	local hash = 'Basic ' .. publishSettings['hash']
+	local filen = filename
+	local restData = {}
+  
+	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
+	  return
+	end
+  
+	local httphead = {
+		{field='Authorization', value=hash},
+		{field='Content-Disposition', value='form-data; filename=' .. filen },
+		{field='Content-Type', value='image/jpeg'},
+	}
+  
+	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+	  
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid)
+	  
+	local result, headers = LrHttp.post( url, imgfile, httphead )
+  
+	if headers.status == 200 then
+		result = JSON:decode(result)
+		--wpid = tonumber(result['id'])
+		--restData = ExtractDataFromREST(result)
+	else
+		  wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+	end
+	
+	return wpid, result
+end
+  
+-- Get all Media Files / one Medie File from WP-Media-Catalog via REST-API. Provide response as JSON
+-- param: page : wenn nicht angegeben, dann muss perpage eine wpid sein!
+-- TODO use param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
+function GetMedia( publishSettings, perpage, page ) 
+  
+	local result = nil
+	if publishSettings == {} or publishSettings == nil then
+	  return result
+	end
+  
+	local _hash = publishSettings.hash or publishSettings['hash']
+	local _siteURL = publishSettings.siteURL or publishSettings['siteURL'] 
+  
+	local hash = 'Basic ' .. _hash
+	local url = '' 
+	  local httphead = {
+		{field='Authorization', value=hash},
+	  }
+	 
+	if tonumber(perpage) ~= nil and tonumber(page) ~= nil then
+		  url = _siteURL .. "/wp-json/wp/v2/media/?per_page=" .. perpage .. '&page=' .. page
+		  Log(url)
+	elseif tonumber(perpage) > 0 and tonumber(page) == nil then
+    	url = _siteURL .. "/wp-json/wp/v2/media/" .. perpage
+  	elseif tonumber(perpage) == 0 then
+    	return
+	else  
+		url = _siteURL .. "/wp-json/wp/v2/media/"
+	end
+	 
+	local result, headers = LrHttp.get( url, httphead )
+  
+	if headers.status == 200 then
+      result = JSON:decode(result)
+  else 
+    result = nil
+	end
+	
+	return result
+end
+  
+  -- Delete Media Files from WP-Media-Catalog via REST-API
+function DeleteMedia( publishSettings, wpmediaid ) 
+	local result = false
+	local idcheck = type(tonumber(wpmediaid))
+	if publishSettings == {} or publishSettings.hash == '' or publishSettings.siteURL == '' or idcheck ~= 'number' then
+	  return result
+	end
+  
+	local hash = 'Basic ' .. publishSettings.hash
+	  local httphead = {
+		{field='Authorization', value=hash},
+	  }
+	local url = ''  
+	
+	  url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
+	--http://127.0.0.1/wordpress/wp-json/wp/v2/media/3439?force=1
+	--http-methode: delete   
+	  local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
+  
+	  if headers.status == 200 then
+		result = JSON:decode(result)
+		result = result['deleted']
+	elseif headers.status == 404 then -- also successful, id is not available
+		result = JSON:decode(result)
+		result = result['code']
+	end
+	
+	return result
+end
+  
+-- Serch pre-selected Images in LR Database, exclude Copies, marked by "Kopie.."
+-- special selection if more then on photo found. Selector: "Rot"
+-- This runs as asynchronous Task! Main Task has to wait. No Signalling between Tasks.
+-- add found photos to WP-LR-Sync-Collection
+function addToWPColl (collection, search, photos, all_collections, all_paths)
+	
+	LrTasks.startAsyncTask(function ()
+		LrMobdebug.on()
+		local str =inspect(all_paths)
+		Log('Paths in addToWPColl: ', str)
+		local catalog = LrApplication.activeCatalog()
+		local len = #photos
+		local selphoto
+		--local lrid
+		local specialsearch = false
+			
+		for i=1,len do
+
+			local filen = photos[i].filen
+			local base, ext = SplitFilename(filen)
+			---- M I : --------------------------
+			local lrid = catalog:findPhotos {
+				searchDesc = {
+					{
+						criteria = "copyname",
+						operation = "any",
+						value = base,
+						value2 = "",
+					},
+					{
+						criteria = "filename",
+						operation = "noneOf",
+						value = base,
+						value2 = "",
+					},
+					combine = "intersect",
+				},
+			}
+
+			--------- Auswahl bei mehr als einem gefundenen Foto
+			if lrid[2] ~= nil and specialsearch then
+				local label = {} 
+				local sel = 0
+				local nred = 0
+				local csel = 0
+				local ncol = 0
+				local coll = {}
+				local pubcoll = {}
+				
+				for k, ph in ipairs(lrid) do
+				label[k] = ph:getFormattedMetadata('label')
+				if label[k] == "Rot" then -- TDODO als Variable setzen, für andere Selektoren
+					sel = k
+					nred = nred +1
+				end
+				coll[k] = ph:getContainedCollections()
+				pubcoll[k] = ph:getContainedPublishedCollections()
+				if ((coll[k] ~= nil) or (pubcoll[k] ~= nil)) then
+					csel = k
+					ncol = ncol +1
+				end
+				
+				end
+				
+				if nred == 1 then
+				selphoto = {lrid[sel]}
+				lrid = selphoto
+				elseif ncol == 1 then
+				selphoto = {lrid[csel]}
+				lrid = selphoto
+				end
+				
+			end
+			
+			photos[i].lrid = lrid -- Speichern der gefundenen Fotos in der Tabelle
+			----------------------------
+			
+	
+
+			-- Collection bestimmen
+			local new_collection
+			local path = photos[i]['path']
+			local index = 0
+					
+			index = findValueInArray(all_paths, path)
+			if index > 0 then
+				new_collection = all_collections[index]
+			else
+				new_collection = collection
+			end
+
+			local name = new_collection:getCollectionInfoSummary()['name']
+			--Log(path .. '=' .. name)
+			Log(photos[i].filen   .. '; N lrid = ;' .. #lrid .. '; Coll ; '.. name)	
+
+			if #lrid > 0 then
+				catalog:withWriteAccessDo( 'AddtoWP', function () 
+						new_collection:addPhotos(lrid)
+				end ) 
+			end
+		end
+	end )
+
+end
+
+-- Update image_meta keys of Media File to WP-Media-Catalog via REST-API
+function UpdateKeys( publishSettings, photometa, wpid ) 
+	local hash = 'Basic ' .. publishSettings['hash']
+	local restData = {}
+  
+	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
+	  return
+	end
+  
+	local httphead = {
+		{field='Authorization', value=hash},
+		{field='Content-Type', value='application/json'},
+	}
+  
+  restData['image_meta'] = photometa
+	local image_meta = JSON:encode(photometa)
+  
+	  
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update_meta/" .. tostring(wpid)
+	  
+	local result, headers = LrHttp.post( url, image_meta, httphead )
+  
+	if headers.status == 200 then
+		result = JSON:decode(result)
+		--wpid = tonumber(result['id'])
+		--restData = ExtractDataFromREST(result)
+	else
+		  wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+	end
+	
+	return wpid, result
+end
+
+-- Reset the Custom Meta-Date of this plugin 
+function ResetCustomMeta (photo)
+  local catalog = LrApplication.activeCatalog()
+  catalog:withWriteAccessDo( 'DeleteCollection', function ()
+    photo:setPropertyForPlugin( _PLUGIN, 'wpid', '' )
+    photo:setPropertyForPlugin( _PLUGIN,'upldate', '' )
+    photo:setPropertyForPlugin( _PLUGIN,'wpwidth', '')
+    photo:setPropertyForPlugin( _PLUGIN,'wpheight', '')
+    photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', '')
+    photo:setPropertyForPlugin( _PLUGIN,'slug', '' )
+    photo:setPropertyForPlugin( _PLUGIN,'post', '')
+    photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
+    --photo:setPropertyForPlugin( _PLUGIN,'order', '' )
+  end )
+end

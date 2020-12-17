@@ -18,7 +18,7 @@ return {
 	
 	LrExportServiceProvider = { -- Definition des Export-Service-Proiders von LR für dieses Plugin-In im angeg. lua-file
 		title = LOC "$$$/WP_MediaCat2/WP_MediaCat2-title=WP_MediaCat2",
-		file = 'Main.lua',
+		file = 'Main-Copy1.lua',
 	},
 		
 	VERSION = { major=1, minor=4, revision=0, build=1, },

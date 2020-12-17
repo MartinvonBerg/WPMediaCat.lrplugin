@@ -34,7 +34,7 @@ local inspect = require 'inspect'
 JSON=require 'JSON'
 require 'Dialogs'
 require 'helpers'
-require 'functions'
+require 'functions-Copy1'
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
@@ -342,56 +342,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   local getmore = true
   local runs = 0
 
-  -- Pfad für die Kopie von lrcat definieren
-  local p = string.gsub( _PLUGIN.path,"\\","/")
-  local lrcatactive = catalog:getPath()
-  lrcatactive = string.gsub( lrcatactive,"\\","/") -- check: zu alt, klein, nicht vorhanden
-  local lrcat = p .. "/" .. getfile(lrcatactive)
-
-  -- Prüfe ob der kopierte Katalog vorhanden und aktuell ist
-  local catsuccess = LrFileUtils.exists(lrcat)
-  if catsuccess == 'file' then -- check: zu alt, klein
-    local attrib = LrFileUtils.fileAttributes( lrcat )
-    if tonumber(attrib['fileSize']) < 4096 then catsuccess = false end
-    local filedate = attrib['fileModificationDate'] -- a number of seconds since midnight UTC on January 1, 2001.
-    local currdate = LrDate.currentTime() -- Retrieves the current date and time as a Cocoa date stamp. that is, a number of seconds since midnight UTC on January 1, 2001.
-    if math.abs(currdate - filedate) > (catoutdate * 24 * 60 * 60) then 
-      catsuccess = false 
-      Log('Cat ' .. lrcat .. ' outdated')
-    end
-  end
-
-  -- wenn Katalog nicht aktuell, dann Katalog kopieren
-  if catsuccess == false or catsuccess == 'directory' then
-    local button = LrDialogs.confirm ( "Local Copy of active LR-Catalog not found or outdated",'Press OK to copy ' .. lrcatactive .. ' to ' .. lrcat)
-    if button == 'cancel' then
-      return
-    else
-      -- do copy of active catalog
-      local waittime = math.floor(LrFileUtils.fileAttributes( lrcatactive )['fileSize'] / (1048576 * HDDwritespeed)) -- Mbyte * HDD - write-speed
-      Log('Copy Cat - wait for: ' .. waittime .. ' seconds')
-      lrcatactive = string.gsub( lrcatactive,"/","\\") -- Quelle
-      lrcat = string.gsub( lrcat,"/","\\")              -- Ziel
-      -- LrShell.openPathsViaCommandLine( {goal:string}, cmd:string, source:string)
-      local succ = LrShell.openPathsViaCommandLine( {lrcat}, "copy", lrcatactive )
-      Log(succ)
-      
-      local pscope1 = LrProgressScope( {
-        title = "Copying LR catalogue. Please Wait!",
-      })
-      for i=1,waittime do
-        pscope1:setPortionComplete(i / waittime)
-        LrTasks.sleep(1)
-      end
-      pscope1:done()
-      
-      if not succ then
-        LrDialogs.message ('Could not copy LR-catalog!','','critical')
-        return
-      end
-    end
-  end
-
   -- Suchlauf bei Debug verkürzen
   if DebugSync then
     perpage = 50 -- Anzahl der Media-Einträge per REST-Abfrage
@@ -447,7 +397,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end
     
     Log('End While')
-    --LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
+    LrDialogs.message ( string.format("Found %d Photos in WordPress-Media-Catalog. Adding to Sync-collection now.", #mediatable),'','info')
     pscope:setPortionComplete(0.2)
 
     -- Suche die Fotos im lokalen LR-Catalog (Eigentlich eine Vorsuche zur Bestimmung der Suchmethode)
@@ -461,11 +411,11 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     local sub
     local Level1 = {}
     local pscopeadd = (0.65 - 0.2) / #mediatable
-    local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
-    Log('Use Cat: ' .. sqcat1)
+    --local sqcat1 = p .. "/sqlite3.exe ".. lrcat 
+    --Log('Use Cat: ' .. sqcat1)
 
     ----------------------------------------------------------
-    -- Suchlauf für alle Dateien
+    -- Suchlauf für alle Dateien : Pfade bestimmen
     for i=1,#mediatable do
         local filen = mediatable[i].filen
         local success = false
@@ -504,139 +454,9 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             npaths = npaths +1
           end
         end
+
+        mediatable[i]['path'] = sub
         -----------------------------------------
-
-        -- Bestimmung der Suchmethode
-        if #filen > 3 and mediatable[i] ~= {} then
-
-          Log('Suche nach : ' .. filen .. ' ---------------------------')
-          local ii,j = filen:find('Kitzb_Alpen_2018-1',1,true)
-          if ii ~= nil then
-            local os = 'WIN'
-          end
-
-          -- Methode I : Voller Dateiname
-          success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where idx_filename is '" .. filen .."'\" > " .. p .. "/test.txt") 
-          local sqltab = {}
-          sqltab = sqlread( p .. "/test.txt", '|')
-          if #sqltab >= 1 then -- einmal gefunden
-            lrid = sqltab[1][1] 
-          end
-          if lrid ~= nil then
-            Log('M I   : ' .. filen .. ' ID = ' .. inspect(sqltab))
-          end
-
-        
-          -- Methode II : originalFilename mit like und Aussortieren der mehrfach gefundenen
-          if lrid == nil then 
-            local base, ext = SplitFilename(filen)
-            success = LrTasks.execute( sqcat1 .. " \"select id_local, idx_filename from AgLibraryFile where originalFilename like '" .. base .."%'\" > " .. p .. "/test.txt") 
-            local sqltab = {}
-            sqltab = sqlread( p .. "/test.txt", '|')
-                      
-            if #sqltab == 1 then -- einmal gefunden
-              lrid = sqltab[1][1] 
-              Log('M II-1: ' .. filen .. ' ID = ' .. inspect(sqltab)) 
-            elseif #sqltab > 1 then -- mehrfach gefunden, Auswahl mit Selektor Colorlabel = 'Rot'
-              local csel = 0
-              local ncol = 0
-              
-              for m=1,#sqltab do
-                local id = tostring(sqltab[m][1] - 1)
-                success = LrTasks.execute( sqcat1 .. " \"select colorLabels from Adobe_images where id_local is '" .. id .."'\" > " .. p .. "/collabel.txt")
-                local label = LrFileUtils.readFile( p ..'/collabel.txt' )
-                --Wenn CololLabel == 'Rot' dann filen = idx_filename
-                if label:find('Rot',1,true) then -- TODO: Rot als Eingabe-Feld
-                  csel = m
-                  ncol = ncol +1
-                end
-              end -- for
-              
-              if ncol == 1 then
-                lrid = sqltab[csel][1]
-                filen = sqltab[csel][2]
-              end
-              Log('M II-2: ' .. filen .. ' ID = ' .. inspect(sqltab))
-            end  
-          end -- end if lrid
-          
-          
-          -- Methode III : Suche mit basename ohne Dateiendung und Platzhaltern in der lokalen Kopie des LR Katalogs
-          if lrid == nil then
-            local base, ext = SplitFilename(filen)
-            base = string.gsub( base,"-","_") -- '-' Unterstrich ist ein Platzhalter für EIN beliebiges Zeichen in SQL. Suche muss mit like erfolgen
-            base = string.gsub( base,"ß","_")
-            base = string.gsub( base,"ö","_")
-            base = string.gsub( base,"ä","_")
-            base = string.gsub( base,"ü","_")
-            
-            if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select id_local from AgLibraryFile where baseName like '" .. base .. "%'\" > " .. p .. "/test.txt") 
-              local sqltab = {}
-              sqltab = sqlread( p .. "/test.txt", '|')
-              if #sqltab >= 1 then -- einmal gefunden
-                lrid = sqltab[1][1] 
-              end
-
-              if lrid ~= nil then
-                base = string.gsub( base,"_"," ") -- in LR funktioniert die Suche aber nur mit einem Leerzeichen
-                searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
-                Log('M III : ' .. base .. ' ID = ' .. inspect(sqltab))
-              end
-
-            end
-          end
-
-         
-          -- Methode IV : Suche nach virt. Kopie in der lokalen Kopie des LR Katalogs
-          if lrid == nil then
-            local base, ext = SplitFilename(filen)
-            base = string.gsub( base,"-","_")
-            base = string.gsub( base,"ß","_")
-            base = string.gsub( base,"ö","_")
-            base = string.gsub( base,"ä","_")
-            base = string.gsub( base,"ü","_")
-                        
-            if base ~= nil then
-              success = LrTasks.execute( sqcat1 .. " \"select rootFile from Adobe_images where copyName like '" .. base .."%'\" > " .. p .. "/test.txt") -- liefert die id_local das master_images
-              local sqltab = {}
-              sqltab = sqlread( p .. "/test.txt", '|')
-              if #sqltab > 0 then -- einmal gefunden
-                lrid = sqltab[1][1] 
-              end
-           
-              if lrid ~= nil then
-                  success = LrTasks.execute( sqcat1 .. " \"select baseName from AgLibraryFile where id_local like '" .. lrid .. "%'\" > " .. p .. "/test.txt")
-                  base = LrFileUtils.readFile( p ..'/test.txt' ) 
-                  base = string.gsub(base, '\r\n', '')
-                  base = string.gsub( base,"_"," ")
-                  Log('M IV  : ' .. base .. ' ID = ' .. inspect(sqltab))
-                  searchdesriptor = { criteria = "filename", operation = "all", value = base, path = sub } -- aus Smart-Sammlung abgeleitet
-              end
-
-            end
-          end
-
-        --- ende der suche mit sqlite
-        else
-          lrid = nil
-        end
-        
-        if lrid ~=nil then
-          foundph[nfound] = mediatable[i] 
-
-          if searchdesriptor == '' then
-            searchDesc[nfound] = { criteria = "filename", operation = "==", value = filen, path = sub}
-          else
-            searchDesc[nfound] = searchdesriptor
-          end 
-          nfound = nfound +1
-
-        else
-          notfound[nnotfound] = mediatable[i]
-          nnotfound = nnotfound +1
-        end
-
         if pscope:isCanceled() then pscope:cancel() end
         pscope:setPortionComplete(0.2 + i * pscopeadd)
 
@@ -678,6 +498,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     if pscope:isCanceled() then pscope:cancel() end
     pscope:setPortionComplete(0.65)
 
+    --[[
     -- nicht gefundene Photos herunterladen und zum Katalog eränzen
     local copyfile = publishSettings.doLocalCopy
     local copypath = publishSettings.localPath
@@ -736,14 +557,14 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       end -- for
 
     end -- copyfile 
-
+    ]]
     
     -- Im Katalog gefundene Fotos zur Collection hinzufügen. Weitere Einschränkung bei mehrfach gefundenden Photos
-    addToWPColl(collection, searchDesc, foundph, Level1, paths) 
+    addToWPColl(collection, searchDesc, mediatable, Level1, paths) 
     ------------------------------------------------------------------------
 
     LrTasks.sleep(nfound*0.2) -- necessary to wait for async process
-    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
+    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog.", nfound-1),'','info')
     pscope:setPortionComplete(0.8)
     if pscope:isCanceled() then pscope:cancel() end
         
@@ -763,6 +584,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     end ) -- catalog:withWriteAccessDo
     
     -- Write csv-File with not found Photos
+    --[[
     if not copyfile then
       for i=1,#foundph do
         if foundph[i].lrid[1] == nil then
@@ -773,15 +595,10 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       local p2 = LrPathUtils.getStandardFilePath( 'documents' )
       csvwrite(p2 .. '/notfound.csv',notfound, ';') 
     end
-    
-    pscope:done()
-    --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
+    ]]
 
-    -- TODO: Download der nicht gefundenen bilder zum Katalog
-    -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.
-    -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
-    -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden
-    -- Metadaten wie auch bei den gefundenen Fotos setzen
+    pscope:done()
+    LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
   
   end -- if firtsync
 
