@@ -62,6 +62,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'WPalt', default = 'LRcap'},
   { key = 'WPdescr', default = 'LRcap'},
   { key = 'WPcap', default = 'LRtit'},
+  { key = 'preCopy', default = 'Copy-'},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
@@ -71,6 +72,7 @@ exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den 
 
 -- this function is only called AFTER publishing AND if custum sort order is selected AND if supportsCustomSortOrder = true
 -- So, after the custum sorting at least one photo has to be re-published to have this sort order written to WP.
+-- wird auch nach dem Löschen aufgerufen!
 function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
    Log('impose Sort aufgerufen')
    local str = inspect(remoteIdSequence)
@@ -88,8 +90,8 @@ function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSett
     success = WritephotoMetaToWp( publishSettings, wpid, photoMeta )
    end
 
-   if not success then
-    LrDialogs.message('Could not write custom Sort-Order to Wordpress for ID: ' .. wpid ,'','info')
+   if not success and wpid ~= nil then
+    LrDialogs.message('Could not write custom Sort-Order to Wordpress for ID: ' .. inspect(wpid) ,'','info')
    end
 
 end
@@ -175,7 +177,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           wpid = 0
           photoMeta['gallery'] = ''
           ResetCustomMeta( photo )
-          local name = 'Copy of ' .. filename
+          --local name = 'Copy of ' .. filename
+          local name = exportSettings.preCopy .. filename
           catalog:withWriteAccessDo( 'SetCopyName', function ()
             photo:setRawMetadata( 'copyName', name )
           end)

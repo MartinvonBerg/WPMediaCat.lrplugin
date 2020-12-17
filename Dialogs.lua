@@ -68,7 +68,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 				},	
 
 				f:group_box {
-					title = "Settings for First-Sync with Wordpress",
+					title = "Settings for (First)-Sync with Wordpress",
 					f:row {
 		
 						f:checkbox {
@@ -99,8 +99,8 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							
 							f:static_text {
 								fill_horizontal = 1,
-								width_in_chars = 20,
-								alignment = 'right',
+								width_in_chars = 30,
+								alignment = 'left',
 								title =  bind 'localPath',
 								visible = bind 'hasNoError',
 							},
@@ -115,12 +115,12 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 					f:row {
 						f:checkbox {
-							title = "Check for Test-Mode",
+							title = "Check for Test-Mode (not used!)",
 							value = bind 'DebugMode',
 						},
 					},
 
-					
+					EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),					
 
 				},
 
@@ -234,6 +234,8 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'WPalt', updateExportStatus )
 	propertyTable:addObserver( 'WPdescr', updateExportStatus )
 	propertyTable:addObserver( 'WPcap', updateExportStatus )
+
+	propertyTable:addObserver( 'preCopy', updateExportStatus )
 
 	updateExportStatus( propertyTable )
 	
