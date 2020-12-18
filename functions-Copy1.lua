@@ -248,7 +248,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
 	photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
 end
   
-  -- Add Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
+  -- Add Media File to WP-Media-Catalog via REST-API
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
 	-- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
 	-- Auch mit FTP wird nicht mehr hochgeladen. NIE!
@@ -321,7 +321,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	return wpid, restData
 end
   
--- Update Media File to WP-Media-Catalog via REST-API: TODO: PNG !!
+-- Update Media File to WP-Media-Catalog via REST-API
 function UpdateMedia( publishSettings, filename, path, wpid ) 
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename

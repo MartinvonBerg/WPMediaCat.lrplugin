@@ -195,7 +195,7 @@ function updateExportStatus( propertyTable )
 	Log('updateExportStatus aufgerufen')
 	local message = nil
 	local locp = ''
-	
+
 	repeat
 		-- Use a repeat loop to allow easy way to "break" out.
 		-- (It only goes through once.)
@@ -205,9 +205,9 @@ function updateExportStatus( propertyTable )
 			locp = propertyTable.localPath 
 		end
 
-		propertyTable.WPalt = 'LRcap'
-  		propertyTable.WPdescr = 'LRcap'
-  		propertyTable.WPcap = 'LRtit'
+		if propertyTable.WPalt[1] == nil then
+			message = 'Selection for Metadata not done!'
+		end
 	
 	until true
 	

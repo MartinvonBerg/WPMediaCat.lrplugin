@@ -59,9 +59,9 @@ exportServiceProvider.exportPresetFields = {
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
   { key = 'doLocalCopy', default = true},
   { key = 'localPath', default = ''},
-  { key = 'WPalt', default = 'LRcap'},
-  { key = 'WPdescr', default = 'LRcap'},
-  { key = 'WPcap', default = 'LRtit'},
+  { key = 'WPalt', default = {'LRcap'}},
+  { key = 'WPdescr', default = {'LRcap'}},
+  { key = 'WPcap', default = {'LRtit'}},
   { key = 'preCopy', default = 'Copy-'},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
@@ -533,7 +533,8 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       for nn=1,#mediatable do
         local photos = mediatable[nn].lrid
       
-        if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png') and #photos == 0 then
+        --if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png') and #photos == 0 then
+        if mediatable[nn].mime == 'image/jpeg' and #photos == 0 then
           local newfilepath = copypath .. '\\' .. mediatable[nn].filen
           -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
