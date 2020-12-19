@@ -8,7 +8,7 @@ local LrTasks = import 'LrTasks'
 
 
 ----- Debug -----------
-require 'strict'
+--require 'strict'
 require 'Logger'
 local DebugSync = logDebug
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module

@@ -5,7 +5,7 @@ by Martin von Berg
 ]]
 
 ------------- Debug ----------------------
-require 'strict.lua'
+--require 'strict.lua'
 local inspect = require 'inspect'
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 --LrMobdebug.start()

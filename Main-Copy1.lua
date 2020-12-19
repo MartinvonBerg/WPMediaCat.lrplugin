@@ -24,8 +24,8 @@ local WPCatColl = 'WPCat'
 require 'strict'
 require 'Logger'
 local DebugSync = false
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 local inspect = require 'inspect'
 ----- Debug -----------
 
@@ -99,7 +99,7 @@ end
 -- publish Photos -- processRenderedPhotos -- main functon for updating and uploading photos to WP  
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
-  --LrMobdebug.on()
+  LrMobdebug.on()
 
   local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
@@ -182,25 +182,39 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
       local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
 
-      -- check if photo is valid, with filename and copyname
-      local validPhoto = data.filen == filename -- Foto mit diesem Dateinamen existiert unter dieser wpid. Vergleichsergebnis wird gleich zugewiesen
+      -- check if photo is valid, with filename and copyname and regex for '_' and '-'
+      local validPhoto = false
+      local lrcopyname = photo:getFormattedMetadata( 'copyName' )
+      local wpBaseFileName, ext = SplitFilename( data.filen ) -- wpfilename : data.filen
+      local base4search = '^' .. string.gsub( wpBaseFileName, "[-_]","[-_]") -- base : wordpress
+      local result1 = nil
+      if lrcopyname ~= nil then
+        result1 = string.match(lrcopyname, base4search) -- lrcopyname kann auch leer sein, d.h.nil
+      end
+      local result2 = string.match(filename, base4search)
+      if result1 ~= nil or result2 ~= nil then
+        validPhoto = true -- Foto mit diesem Dateinamen existiert unter dieser wpid. Vergleichsergebnis wird gleich zugewiesen
+      end    
       
-      
-      -- check the manually created virtual copy, reset Custom-metadata and set CopyName if ok
+      -- check the manually created NEW virtual copy, reset Custom-metadata and set CopyName if ok
       -- filenames are OK but foldernames and gallery-names do not match
+      local isVirtCopy = photo:getRawMetadata('isVirtualCopy') -- bool
+      local pubColl = photo:getContainedPublishedCollections()
+      
       if validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
-        local isVirtCopy = photo:getRawMetadata('isVirtualCopy') -- bool
-        local pubColl = photo:getContainedPublishedCollections()
-       
-        if isVirtCopy and #pubColl == 1 then
+          
+        if isVirtCopy and #pubColl == 1 and rendition.publishedPhotoId == nil and result1 == nil then -- recordPublishedPhotoId( ImageID ) ist hier auch noch leer
           wpid = 0
           photoMeta['gallery'] = ''
           ResetCustomMeta( photo )
           --local name = 'Copy of ' .. filename
-          local name = exportSettings.preCopy .. filename
+          local lrcopyname = photo:getFormattedMetadata( 'copyName' )
+          lrcopyname = string.gsub( lrcopyname, ' ', '-')
+          local name = lrcopyname .. filename
           catalog:withWriteAccessDo( 'SetCopyName', function ()
             photo:setRawMetadata( 'copyName', name )
           end)
+          filename = name -- Namen der virt. Kopie verwenden!
         end
       
       end
@@ -238,6 +252,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               -- update photo including keywords
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+              -- write WP-dimensions of image to Custom-Metadata. 
+              catalog:withWriteAccessDo( 'UpdateDimension', function ()
+                photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
+                photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
+              end )
             end
                  
             -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
@@ -265,6 +284,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               -- update photo including keywords
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+              -- write WP-dimensions of image to Custom-Metadata. 
+              catalog:withWriteAccessDo( 'UpdateDimension', function ()
+                photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
+                photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
+              end )
             end
 
             if LrMeta_to_WP then
@@ -273,21 +297,25 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else 
               --Meta: WP --> LR  : WP-data in data
+              -- Check propertyTable selection for LRcap 
+              local value = photo:getFormattedMetadata( 'caption' ) --fallback
+              if LRcap == 'WPalt'  then 
+                value = data.alt
+              elseif LRcap == 'WPdescr' then
+                value = data.descr
+              elseif LRcap == 'WPcap' then
+                value = data.caption
+              end
+
               catalog:withWriteAccessDo( 'SetLRMetaData', function ()
-                photo:setRawMetadata( 'title', data.title.rendered )
-                --photo:setRawMetadata( 'caption', value ) hier fehlt die 1:1 Beziehung
+                photo:setRawMetadata( 'title', data.title )
+                photo:setRawMetadata( 'caption', value ) 
               end )
 
             end
             ImageID  = 'WPSync' .. tostring(wpid) 
           end
           
-          -- write WP-dimensions of image to Custom-Metadata. Always!
-          catalog:withWriteAccessDo( 'UpdateDimension', function ()
-            photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
-            photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
-          end )
-
           renderedPhoto[i] = {}
           renderedPhoto[i][1] = photo
           renderedPhoto[i][2] = ImageID -- remoteID
@@ -326,7 +354,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           end
 
           Log('Upload created new WPId: ' .. ImageID .. ' if empty: not created')
-      elseif validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
+      --elseif validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
+      else
           -- do nothing skip
           countnotuploaded = countnotuploaded + 1
           notuploaded[countnotuploaded] = filename
@@ -764,7 +793,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
       if wpid == nil or wpid =='' then wpid = 0 end
       Log('wpid to delete: ', wpid)
       local success = false
-
+      --[[
       -- Check timestamps before delete and calculate difference of timestamps
       local difftime = -1
       local wptime = -1
@@ -793,12 +822,12 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
         end
 
       end
-    
+      ]]
       --if (tonumber(wpid) > 0) and (difftime == 0) then
         -- geplant war Bilder mit falscher Zeitdifferenz nicht zu löschen
         -- Der Schutz funktioniert: Metadaten werden entfernt und das Foto aus der Collection
         -- Bei erstellten Panos wird aber die Erstellungszeit geändert! Daher: IMMER löschen!
-      if (tonumber(wpid) > 0) and (difftime == 0) then 
+      if (tonumber(wpid) > 0) then 
         success = DeleteMedia(publishSettings, wpid)
       end
 

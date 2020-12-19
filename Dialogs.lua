@@ -280,34 +280,6 @@ function dialogs.startDialog( propertyTable )
 	updateExportStatus( propertyTable )
 	
 end
---[[
-function checkMeta (propertyTable)
-  LrMobdebug.on()
-	Log('checkmeta aufgerufen')
-	local message = 'Passt net'
-  Log('......' .. inspect(propertyTable.LRcap))
-
-	if propertyTable.LRcap == {'WPalt'} and propertyTable.WPalt[1] ~= 'LRcap' then
-		Log('MetaData mismatch')
-		message = 'MetaData mismatch'
-	else
-		message = false
-	end
-	
-	if message then
-		Log(message)
-		propertyTable.message = message
-		propertyTable.hasError = true
-		propertyTable.hasNoError = false
-		propertyTable.LR_cantExportBecause = message
-	else
-		propertyTable.message = nil
-		propertyTable.hasError = false
-		propertyTable.hasNoError = true
-		propertyTable.LR_cantExportBecause = nil
-	end
-end
-]]
 
 -- prüft die eingegebene URL im Feld 'Site URL' bei Änderungen im Feld
 -- gibt Fehlermeldung aus, wenn kein https verwendet oder http(s) ganz fehlt
