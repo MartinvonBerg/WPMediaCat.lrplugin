@@ -113,19 +113,37 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						},
 					},
 
+					EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),
+
+					--[[            
 					f:row {
 						f:checkbox {
 							title = "Check for Test-Mode (not used!)",
 							value = bind 'DebugMode',
 						},
 					},
+					]]
 
-					EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),					
+					f:row {
+						f:checkbox {
+							title = "Only Do Metadata at first Sync. WP Image Files will not touched if checked!",
+							value = bind 'firstSyncDoMetaOnly',
+						},
+					},
+
+					f:row {
+						f:checkbox {
+							title = "First-Sync Metadata handling: CHECKED: LR --> WP || NOT CHECKED: WP --> LR",
+							value = bind 'LrMeta_to_WP',
+						},
+					},
+
+										
 
 				},
 
 				f:group_box {
-					title = "Select Values-Settings for WP-Metadata",
+					title = "Select Values-Settings for WP-Metadata. WARNING: No consistency check is done!",
 
 					f:column {
 						--place = 'overlapping',
@@ -133,18 +151,24 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						f:row {
 							f:static_text {
 								fill_horizontal = 0,
-								width_in_chars = 17,
+								width_in_chars = 15,
 								title = 'WP-alt_text',
 							},
 							f:static_text {
 								fill_horizontal = 0,
-								width_in_chars = 17,
+								width_in_chars = 15,
 								title = 'WP-description',
 							},
 							f:static_text {
 								fill_horizontal = 0,
-								width_in_chars = 17,
+								width_in_chars = 15,
 								title = 'WP-caption',
+							},
+							f:static_text {
+								fill_horizontal = 0,
+								width_in_chars = 15,
+								title = 'LR-caption',
+								text_color = LrColor( 1, 0, 0 ),
 							},
 						},	
 
@@ -156,10 +180,9 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								items = { {title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
 								value = bind 'WPalt',
 							},
-								
 
 							f:spacer {
-								width = 40
+								width = 25
 							},
 
 							f:simple_list {
@@ -171,7 +194,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							},
 
 							f:spacer {
-								width = 40
+								width = 25
 							},	
 								
 							f:simple_list {
@@ -181,6 +204,18 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
 								value = bind 'WPcap',
 							},	
+
+							f:spacer {
+								width = 25
+							},	
+								
+							f:simple_list {
+								height = 80,
+								width = 120,
+								allows_multiple_selection = false,
+								items = { {title = "WP-alt_text", value = 'WPalt'}, {title = "WP-description", value = 'WPdescr'}, {title = "WP-caption", value = 'WPcap'},  },
+								value = bind 'LRcap',
+							}
 						},
 					},		
 				},
@@ -204,14 +239,11 @@ function updateExportStatus( propertyTable )
 			locp = ''
 			locp = propertyTable.localPath 
 		end
-
-		if propertyTable.WPalt[1] == nil then
-			message = 'Selection for Metadata not done!'
-		end
 	
 	until true
 	
 	if message then
+		Log(message)
 		propertyTable.message = message
 		propertyTable.hasError = true
 		propertyTable.hasNoError = false
@@ -240,10 +272,42 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'WPcap', updateExportStatus )
 
 	propertyTable:addObserver( 'preCopy', updateExportStatus )
+	propertyTable:addObserver( 'firstSyncDoMetaOnly', updateExportStatus )
+	propertyTable:addObserver( 'LrMeta_to_WP', updateExportStatus )
+
+	propertyTable:addObserver( 'LRcap', updateExportStatus )
 
 	updateExportStatus( propertyTable )
 	
 end
+--[[
+function checkMeta (propertyTable)
+  LrMobdebug.on()
+	Log('checkmeta aufgerufen')
+	local message = 'Passt net'
+  Log('......' .. inspect(propertyTable.LRcap))
+
+	if propertyTable.LRcap == {'WPalt'} and propertyTable.WPalt[1] ~= 'LRcap' then
+		Log('MetaData mismatch')
+		message = 'MetaData mismatch'
+	else
+		message = false
+	end
+	
+	if message then
+		Log(message)
+		propertyTable.message = message
+		propertyTable.hasError = true
+		propertyTable.hasNoError = false
+		propertyTable.LR_cantExportBecause = message
+	else
+		propertyTable.message = nil
+		propertyTable.hasError = false
+		propertyTable.hasNoError = true
+		propertyTable.LR_cantExportBecause = nil
+	end
+end
+]]
 
 -- prüft die eingegebene URL im Feld 'Site URL' bei Änderungen im Feld
 -- gibt Fehlermeldung aus, wenn kein https verwendet oder http(s) ganz fehlt

@@ -17,8 +17,6 @@ local LrSystemInfo = import 'LrSystemInfo'
 
 
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
-local catoutdate = 2 -- max. allowd age of lrcat-copy in days
-local HDDwritespeed = 100 -- in MBytes / s
 local WPCatColl = 'WPCat'
 
 ----- Debug -----------
@@ -26,8 +24,8 @@ local WPCatColl = 'WPCat'
 require 'strict'
 require 'Logger'
 local DebugSync = false
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 local inspect = require 'inspect'
 ----- Debug -----------
 
@@ -55,14 +53,16 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "hash", default = ""},
 	{ key = "DebugMode", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
-  { key = "firstsync", default = false},
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
   { key = 'doLocalCopy', default = true},
   { key = 'localPath', default = ''},
   { key = 'WPalt', default = {'LRcap'}},
+  { key = 'LRcap', default = {'WPalt'}},
   { key = 'WPdescr', default = {'LRcap'}},
   { key = 'WPcap', default = {'LRtit'}},
   { key = 'preCopy', default = 'Copy-'},
+  { key = 'firstSyncDoMetaOnly', default = true},
+  { key = 'LrMeta_to_WP', default = false},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
@@ -99,7 +99,7 @@ end
 -- publish Photos -- processRenderedPhotos -- main functon for updating and uploading photos to WP  
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
-  LrMobdebug.on()
+  --LrMobdebug.on()
 
   local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
@@ -134,6 +134,23 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     return 
   end
 
+  -- Check Metadata match
+  local LRcap = pseudoPublishSettings['LRcap'][1]
+  local WPalt = pseudoPublishSettings['WPalt'][1]
+	local WPdescr = pseudoPublishSettings['WPdescr'][1]
+  local WPcap = pseudoPublishSettings['WPcap'][1]
+  local metaMatch = false
+  
+  if ((LRcap == 'WPalt') and (WPalt == 'LRcap')) or ((LRcap == 'WPdescr') and (WPdescr == 'LRcap')) or ((LRcap == 'WPcap') and (WPcap == 'LRcap')) then 
+    metaMatch = true
+  else
+    Log('MetaData mismatch')
+    metaMatch = false
+    LrDialogs.message ('Warning','Mismatch of MetaData Assignment! Check Export Settings! Upload is canceled!')
+    progressScope:done()
+    return 
+  end 
+
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     
     local success, pathOrMessage = rendition:waitForRender()
@@ -153,7 +170,6 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         keywords = photo:getFormattedMetadata('keywordTagsForExport'), -- return keys as table
         credit = photo:getFormattedMetadata( 'artist' ),
         copyright = photo:getFormattedMetadata( 'copyright' ),
-        --sortorder = i,
       }
 
       -- get REST-Meta-Data
@@ -165,10 +181,13 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
       local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
       local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
-      local validPhoto = data.filen == filename
+
+      -- check if photo is valid, with filename and copyname
+      local validPhoto = data.filen == filename -- Foto mit diesem Dateinamen existiert unter dieser wpid. Vergleichsergebnis wird gleich zugewiesen
       
       
-      -- check the manually created virtual copy and reset metadata if ok
+      -- check the manually created virtual copy, reset Custom-metadata and set CopyName if ok
+      -- filenames are OK but foldernames and gallery-names do not match
       if validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
         local isVirtCopy = photo:getRawMetadata('isVirtualCopy') -- bool
         local pubColl = photo:getContainedPublishedCollections()
@@ -186,7 +205,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       
       end
       
-      -- Feset Metadata if the photo is not valid, meaning the filenames does not match
+      -- Feset Metadata if the photo is not valid, meaning the filenames do not match --> Force generation of new photo in WP-media-cat. Never overwrite
       if not validPhoto then
         wpid = 0
         photoMeta['gallery'] = ''
@@ -202,41 +221,71 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           Log('Rendition-Datei: ' .. renditionFilePath)
           Log('Folder = Gallery: ' .. folder .. ' : ' .. data.gallery)
           Log('Size: ' .. data.MD5.size .. ' : ' .. rendFileSize)
-                  
-          if mytonumber(data.MD5.size) == rendFileSize then
-            -- update keywords only (tritt vermutlich nie ein, da bei LR die rendition immer eine andere MD5-Summe hat)
-            Log('    Files identical')
-            result = 'none'
-            result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
-          else
-            -- update photo including keywords
-            result = 'none'
-            result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
-          end
-        
-          -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
-          if data['title'] == photoMeta['title'] and (data['caption'] == photoMeta['title']) then -- title und caption = title
-            photoMeta['title'] = '' 
-          end 
 
-          if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
-            photoMeta['caption'] = '' 
-          end
+          local firstSync = rendition.publishedPhotoId == nil --boolean
+          local firstSyncDoMetaOnly = pseudoPublishSettings['firstSyncDoMetaOnly'] -- false: image-files in WP will be updated at firstSync
+          local LrMeta_to_WP = pseudoPublishSettings['LrMeta_to_WP'] -- true: LR --> WP || false WP --> LR for Metadata only at firstSync
+          
+          -- bei firstsync Daten in LR mit WP-Daten überschreiben und WP nicht verändern!
+          if not firstSync then
 
-          if data['gallery'] == photoMeta['gallery'] then photoMeta['gallery'] = '' end
-        
-          local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
-          if success then
-            Log('WpId :' .. wpid .. ' REST-Meta was updated')
-            ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
-          else
-            ImageID = ''
+            if mytonumber(data.MD5.size) == rendFileSize then 
+              -- update keywords only if filesizes are identical
+              Log('    Files identical')
+              result = 'none'
+              result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
+            else
+              -- update photo including keywords
+              result = 'none'
+              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+            end
+                 
+            -- Prüfung auf Identität. wenn hier Änderung in der Logik, dann auch in Funktion WritephotoMetaToWp ändern!
+            -- wenn gleich, dann leeren String setzen --> Es wird dann nichts geändert: geht nich mehr bei variabler zuweisung, zu viele Abhängigkeiten
+            --if data['title'] == photoMeta['title'] then photoMeta['title'] = '' end 
+
+            --if (data['alt'] == photoMeta['caption']) and (data['descr'] == photoMeta['caption'])   then --alt und descr = caption
+            --  photoMeta['caption'] = '' 
+            --end
+            if data['gallery'] == photoMeta['gallery'] then photoMeta['gallery'] = '' end
+          
+            local success = WritephotoMetaToWp( pseudoPublishSettings, tonumber(wpid), photoMeta )
+            if success then
+              Log('WpId :' .. wpid .. ' REST-Meta was updated')
+              ImageID  = 'WPSync' .. tostring(wpid) -- published before?  -- set to wpid
+            else
+              ImageID = '' -- photo wird als unpublished gesetzt
+            end
+
+          elseif firstSync then
+
+            if firstSyncDoMetaOnly  then 
+              -- update keywords only later
+            else
+              -- update photo including keywords
+              result = 'none'
+              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+            end
+
+            if LrMeta_to_WP then
+              -- Meta: LR --> WP at firstSync (not tested)
+              WritephotoMetaToWp( pseudoPublishSettings, wpid, photoMeta )
+              result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
+            else 
+              --Meta: WP --> LR  : WP-data in data
+              catalog:withWriteAccessDo( 'SetLRMetaData', function ()
+                photo:setRawMetadata( 'title', data.title.rendered )
+                --photo:setRawMetadata( 'caption', value ) hier fehlt die 1:1 Beziehung
+              end )
+
+            end
+            ImageID  = 'WPSync' .. tostring(wpid) 
           end
           
+          -- write WP-dimensions of image to Custom-Metadata. Always!
           catalog:withWriteAccessDo( 'UpdateDimension', function ()
             photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
             photo:setPropertyForPlugin( _PLUGIN,'wpheight', tostring(dimensions['height']) )
-            --photo:setPropertyForPlugin( _PLUGIN,'order', tostring(i) )
           end )
 
           renderedPhoto[i] = {}
@@ -331,7 +380,7 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  LrMobdebug.on()
+  --LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local pubService = info.publishService
@@ -358,8 +407,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   
   if #nphotos == 0 then
     firstsync = true -- Zugriff in processRenderedPhotos nur mit exportContext.propertyTable.firstsync
-    publishSettings.firstsync = true
-    --TODO: exportContext.propertyTable.firstsync = true
   end
   
   -- Nur bei Firstsync also wenn die Collection leer ist
@@ -668,68 +715,7 @@ function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
   end
 
   LrTasks.execute(copyCmd)
-  --LrDialogs.message(message2, wp, 'info')
-
-  -------------- colltest-----------------
-  local pubService = info.publishService
-  local catalog = LrApplication.activeCatalog()
-  local paths = {}
-  local npaths = 1
-  local sub
-  local name = pubService:getName()
-  Log(name)
-  local psid = pubService:getPluginId()
-  Log(psid)
-  local Level1 = {}
-
-  -- Gefundene Pfade in paths zu collectionSets und Collections verarbeiten
-  paths = {"Gallerie/Sync1/","Gallerie/Sync2/","Test1/","Test2/a1/", "Test2/a2/", "Foto_Albums/Franken-Dennenlohe/","Albums/","Foto_Albums/Bike-Hike-Col-de-Peas/","Neu/",""}
-  local str = inspect(paths)
-  Log(paths)
-  for m=1, #paths-1 do 
-    local collections = strsplit(paths[m], '/' )
-    local ncollections = #collections-1
-    -- first Level
-    --local level = 1
-    local collparent = nil
-    Level1[m] = {}
-    local result
-
-    for level=1, ncollections do
-      local coll = collections[level]
-      Log(coll)
-     
-      if level < ncollections then
-        catalog:withWriteAccessDo( 'Create1stLevel', function ()
-          result = pubService:createPublishedCollectionSet( coll, collparent, true) -- Ergebnis kann nicht übergeben werden, führt zu Fehler!
-        end)
-        -- set this to parent -- Fehl Suche in vorhandenen, ob die Coll bereits vorhanden ist
-        collparent = result
-      elseif level == ncollections then
-        catalog:withWriteAccessDo( 'Create1stLevel', function ()
-          result = pubService:createPublishedCollection( coll, collparent, true)
-        end)
-        
-      end
-    end
-
-    Level1[m] = result
-  end
-
-  --[[
-  Log('Adding to Collections')
-  for m=1, #Level1 do
-    local photos = {}
-    photos[1] = photo
-    local coll = Level1[m]
-    Log(coll.type())
-    catalog:withWriteAccessDo( 'AddOnePhoto', function ()
-      Log('writeAccess')
-      coll.addPhotos( photo )
-    end)
-    
-  end  
-  ]]
+  LrDialogs.message(message2, wp, 'info')
   
 end
 
@@ -737,7 +723,7 @@ end
 -- Quelle: https://github.com/willthames/photodeck.lrdevplugin : PhotoDeckPublishServiceProvider.lua (Zeilen 313ff)
 function exportServiceProvider.deletePhotosFromPublishedCollection (publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId)
   Log('publishServiceProvider.deletePhotosFromPublishedCollection')
-  LrMobdebug.on() 
+  --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
   local publishedPhotoById = {}
   local photoUnpublish = {}
@@ -766,7 +752,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
   end
   
   LrTasks.startAsyncTask(function ()
-    LrMobdebug.on()
+    --LrMobdebug.on()
     local hash = 'Basic ' .. publishSettings.hash
 	  local httphead = {
       {field='Authorization', value=hash},
@@ -843,6 +829,9 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   Log('getCollectionBehaviorInfo call')
   Log('WP-Plugin installed: ', publishSettings.wpplugin)
   Log('WPalt : ' .. inspect(publishSettings.WPalt[1]) .. '  WPdescr = ' .. inspect(publishSettings.WPdescr[1]) .. '  WPcap = ' .. inspect(publishSettings.WPcap[1]) )
+  Log('LRcap : ' .. inspect(publishSettings.LRcap[1]))
+  Log('firstSyncDoMetaOnly : ' .. inspect(publishSettings.firstSyncDoMetaOnly))
+  Log('LrMeta_to_WP : ' .. inspect(publishSettings.LrMeta_to_WP))
 
 	return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
@@ -856,7 +845,7 @@ end
 -- Funktion zum Löschen einer ganzen Collection / Folder / Gallerie. Nur für Zusätzliche, nicht der Standard-Folder
 -- löscht nur die Fotos im Folder, nicht den Folder im Upload-Verzeichnis
 function exportServiceProvider.deletePublishedCollection( publishSettings, info )
-  LrMobdebug.on() 
+  --LrMobdebug.on() 
   local catalog = LrApplication.activeCatalog()
   local publishedCollection = info.publishedCollection
   local name = info.name
@@ -887,7 +876,7 @@ end
 
 -- prüft den gerade erstellten Collection-Name und löscht diesen falls falsch
 function exportServiceProvider.endDialogForCollectionSettings( publishSettings, info )
-  LrMobdebug.on() 
+  --LrMobdebug.on() 
   local folder = info.name 
   local collection = info.publishedCollection
   local ok = false 
@@ -908,7 +897,7 @@ end
 -- prüft den gerade erstellten Collection-Set-Name und löscht diesen falls falsch
 -- funktioniert nur für den CollectionSet Name nicht für die ganze Hierarchie, daher muss in process rendered Photo nochmals geprüft werden
 function exportServiceProvider.endDialogForCollectionSetSettings( publishSettings, info )
-  LrMobdebug.on() 
+  --LrMobdebug.on() 
   local folder = info.name 
   local collection = info.publishedCollectionSet
   local ok = false 

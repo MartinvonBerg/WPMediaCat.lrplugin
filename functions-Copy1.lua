@@ -11,8 +11,8 @@ local LrTasks = import 'LrTasks'
 require 'strict'
 require 'Logger'
 local DebugSync = logDebug
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 local inspect = require 'inspect'
 ----- Debug -----------
 
@@ -28,7 +28,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
-	LrMobdebug.on()  
+	--LrMobdebug.on()  
 	local success = false
   
 	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
@@ -53,7 +53,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	for k, v in pairs(photoMeta) do
 		
 	  -- LR Caption (caption)	
-	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then 
 		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
 
 		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
@@ -78,7 +78,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	  end
 	  
 	  -- LR Title
-	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then -- TODO : bei mehr Metadaten durch case switch ersetzen
+	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then 
 		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
 
 		local str = 'title=' .. v -- der Titel wird immer fix in den Titel geschrieben
@@ -248,7 +248,7 @@ function WriteCustomMetaData( publishSettings, photo, restmetadata )
 	photo:setPropertyForPlugin( _PLUGIN,'wpimgurl', url )
 end
   
-  -- Add Media File to WP-Media-Catalog via REST-API
+-- Add Media File to WP-Media-Catalog via REST-API
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
 	-- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
 	-- Auch mit FTP wird nicht mehr hochgeladen. NIE!
@@ -395,7 +395,7 @@ function GetMedia( publishSettings, perpage, page )
 	return result
 end
   
-  -- Delete Media Files from WP-Media-Catalog via REST-API
+-- Delete Media Files from WP-Media-Catalog via REST-API
 function DeleteMedia( publishSettings, wpmediaid ) 
 	local result = false
 	local idcheck = type(tonumber(wpmediaid))
@@ -432,7 +432,7 @@ end
 function addToWPColl (collection, search, photos, all_collections, all_paths)
 	
 	LrTasks.startAsyncTask(function ()
-		LrMobdebug.on()
+		--LrMobdebug.on()
 		local str =inspect(all_paths)
 		Log('Paths in addToWPColl: ', str)
 		local catalog = LrApplication.activeCatalog()
