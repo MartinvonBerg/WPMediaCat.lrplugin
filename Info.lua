@@ -9,8 +9,8 @@ Status: Auslesen des Medienkatalogs via REST-API und finden der Files in der LR 
 
 return {
 	
-	LrSdkVersion = 3.0,
-	LrSdkMinimumVersion = 3.0, -- minimum SDK version required by this plug-in
+	LrSdkVersion = 6.0,
+	LrSdkMinimumVersion = 6.0, -- minimum SDK version required by this plug-in
 	LrToolkitIdentifier = 'com.adobe.lightroom.export.wp_mediacat2',
 	LrPluginName = LOC "$$$/WP_MediaCat2/PluginName=WP_MediaCat2",
 

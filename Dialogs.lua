@@ -113,7 +113,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						},
 					},
 
-					EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),
+					--EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),
 
 					--[[            
 					f:row {

@@ -8,11 +8,11 @@ local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
-local LrExportSession = import 'LrExportSession'
-local LrShell = import 'LrShell'
-local LrMD5 = import 'LrMD5'
+--local LrExportSession = import 'LrExportSession'
+--local LrShell = import 'LrShell'
+--local LrMD5 = import 'LrMD5'
 local LrPhotoInfo = import 'LrPhotoInfo'
-local LrSelection = import 'LrSelection'
+--local LrSelection = import 'LrSelection'
 local LrSystemInfo = import 'LrSystemInfo'
 
 
@@ -21,11 +21,11 @@ local WPCatColl = 'WPCat'
 
 ----- Debug -----------
 --logDebug = false
-require 'strict'
+--require 'strict'
 require 'Logger'
 local DebugSync = false
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 local inspect = require 'inspect'
 ----- Debug -----------
 
@@ -55,7 +55,7 @@ exportServiceProvider.exportPresetFields = {
   { key = "urlreadable", default = false},
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
   { key = 'doLocalCopy', default = true},
-  { key = 'localPath', default = ''},
+  { key = 'localPath', default = 'D:\\WPcat'},
   { key = 'WPalt', default = {'LRcap'}},
   { key = 'LRcap', default = {'WPalt'}},
   { key = 'WPdescr', default = {'LRcap'}},
@@ -418,7 +418,7 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  LrMobdebug.on()
+  --LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local pubService = info.publishService
