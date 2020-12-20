@@ -64,7 +64,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'firstSyncDoMetaOnly', default = true},
   { key = 'LrMeta_to_WP', default = false},
 }
-exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
+exportServiceProvider.titleForGoToPublishedCollection = 'First-Sync with Wordpress. ' .. WPCatColl .. ' only!'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
 exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
@@ -99,7 +99,7 @@ end
 -- publish Photos -- processRenderedPhotos -- main functon for updating and uploading photos to WP  
 function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
   Log('processRenderedPhotos aufgerufen')
-  LrMobdebug.on()
+  --LrMobdebug.on()
 
   local exportSession = exportContext.exportSession
   local exportSettings = exportContext.propertyTable
@@ -185,13 +185,24 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       -- check if photo is valid, with filename and copyname and regex for '_' and '-'
       local validPhoto = false
       local lrcopyname = photo:getFormattedMetadata( 'copyName' )
-      local wpBaseFileName, ext = SplitFilename( data.filen ) -- wpfilename : data.filen
-      local base4search = '^' .. string.gsub( wpBaseFileName, "[-_]","[-_]") -- base : wordpress
+
+      local base4search = nil
       local result1 = nil
-      if lrcopyname ~= nil then
+      local result2 = nil
+
+      if data.filen ~= nil then
+        local wpBaseFileName, ext = SplitFilename( data.filen ) -- wpfilename : data.filen
+        base4search = '^' .. string.gsub( wpBaseFileName, "[-_]","[-_]") -- base : wordpress
+      end
+
+      if lrcopyname ~= nil and base4search ~= nil then
         result1 = string.match(lrcopyname, base4search) -- lrcopyname kann auch leer sein, d.h.nil
       end
-      local result2 = string.match(filename, base4search)
+
+      if base4search ~= nil then
+        result2 = string.match(filename, base4search)
+      end 
+
       if result1 ~= nil or result2 ~= nil then
         validPhoto = true -- Foto mit diesem Dateinamen existiert unter dieser wpid. Vergleichsergebnis wird gleich zugewiesen
       end    
@@ -200,24 +211,22 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       -- filenames are OK but foldernames and gallery-names do not match
       local isVirtCopy = photo:getRawMetadata('isVirtualCopy') -- bool
       local pubColl = photo:getContainedPublishedCollections()
-      
-      if validPhoto and ((folder ~= data.gallery) or (folder == WPCatColl and data.gallery ~= '')) then
-          
-        if isVirtCopy and #pubColl == 1 and rendition.publishedPhotoId == nil and result1 == nil then -- recordPublishedPhotoId( ImageID ) ist hier auch noch leer
-          wpid = 0
-          photoMeta['gallery'] = ''
-          ResetCustomMeta( photo )
-          --local name = 'Copy of ' .. filename
-          local lrcopyname = photo:getFormattedMetadata( 'copyName' )
-          lrcopyname = string.gsub( lrcopyname, ' ', '-')
-          local name = lrcopyname .. filename
-          catalog:withWriteAccessDo( 'SetCopyName', function ()
-            photo:setRawMetadata( 'copyName', name )
-          end)
-          filename = name -- Namen der virt. Kopie verwenden!
-        end
-      
+               
+      if validPhoto and isVirtCopy and #pubColl == 1 and rendition.publishedPhotoId == nil and result1 == nil then -- recordPublishedPhotoId( ImageID ) ist hier auch noch leer
+        wpid = 0
+        photoMeta['gallery'] = ''
+        ResetCustomMeta( photo )
+        --local name = 'Copy of ' .. filename
+        local lrcopyname = photo:getFormattedMetadata( 'copyName' )
+        lrcopyname = string.gsub( lrcopyname, ' ', '-')
+        local name = lrcopyname .. '-' .. filename
+        catalog:withWriteAccessDo( 'SetCopyName', function ()
+          photo:setRawMetadata( 'copyName', name )
+        end)
+        filename = name -- Namen der virt. Kopie verwenden!
       end
+      
+      
       
       -- Feset Metadata if the photo is not valid, meaning the filenames do not match --> Force generation of new photo in WP-media-cat. Never overwrite
       if not validPhoto then
@@ -409,10 +418,11 @@ end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'
 function exportServiceProvider.goToPublishedCollection( publishSettings, info )
-  --LrMobdebug.on()
+  LrMobdebug.on()
   Log('goToPublishedCollection aufgerufen (Sync with Wordpress)')
   local collection = info.publishedCollection
   local pubService = info.publishService
+  local defaultcoll = info.publishedCollectionInfo.isDefaultCollection
   local catalog = LrApplication.activeCatalog()
   local nphotos = collection:getPhotos() -- array of LrPhoto
   local firstsync = false
@@ -439,7 +449,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
   end
   
   -- Nur bei Firstsync also wenn die Collection leer ist
-  if (firstsync == true and publishSettings.urlreadable == true) then
+  if (firstsync == true and publishSettings.urlreadable == true and defaultcoll) then
     Log('Start First Sync')
     pscope:setPortionComplete(0.05)
 

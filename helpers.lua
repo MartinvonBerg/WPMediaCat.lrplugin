@@ -8,7 +8,11 @@ local LrDate = import( 'LrDate' )
 
 -- Returns the baseFilename, and Extension as 2 values
 function SplitFilename(strFilename)
-	return string.match(strFilename, "(.-)%.(%a+)")
+    if strFilename ~= nil then
+        return string.match(strFilename, "(.-)%.(%a+)")
+    else
+        return nil
+    end
 end
 
 ---------------------- shorted if expressions ----------------------------------------------------------
