@@ -19,6 +19,12 @@ local LrSystemInfo = import 'LrSystemInfo'
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
 local WPCatColl = 'WPCat'
 
+local os = LrSystemInfo.osVersion()
+local ii,j = string.find(os,'indows') -- den vollen Filename suchen
+if ii ~= nil then
+  os = 'WIN'
+end
+
 ----- Debug -----------
 --logDebug = false
 --require 'strict'
@@ -54,7 +60,7 @@ exportServiceProvider.exportPresetFields = {
 	{ key = "DebugMode", default = false}, -- Currently used for Debugging activation
   { key = "urlreadable", default = false},
   { key = "wpplugin", default = false}, -- wird nur bei "Check Login" geprüft. Danach nicht mehr, wenn dann entfernt, dann keine Fehlermeldung
-  { key = 'doLocalCopy', default = true},
+  { key = 'doLocalCopy', default = false},
   { key = 'localPath', default = 'D:\\WPcat'},
   { key = 'WPalt', default = {'LRcap'}},
   { key = 'LRcap', default = {'WPalt'}},
@@ -732,11 +738,11 @@ function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
   data = ExtractDataFromREST(data)              -- data = {} if data-in = nil
   srcurl = data.phurl
 
-  local os = LrSystemInfo.osVersion()
-  local ii,j = string.find(os,'indows') -- den vollen Filename suchen
-  if ii ~= nil then
-    os = 'WIN'
-  end
+  --local os = LrSystemInfo.osVersion()
+  --local ii,j = string.find(os,'indows') -- den vollen Filename suchen
+  --if ii ~= nil then
+  --  os = 'WIN'
+  -- end
   
   -- Create nested folder name from parents of collection sets
   for i=#parents,1,-1 do

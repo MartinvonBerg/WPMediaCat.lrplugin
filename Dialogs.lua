@@ -8,6 +8,7 @@ local LrView = import 'LrView'
 local LrDialogs = import 'LrDialogs'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrColor = import 'LrColor'
+local LrHttp = import 'LrHttp'
 local share = LrView.share
 require 'Post'
 local inspect = require 'inspect' 
@@ -27,13 +28,35 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 			title = "Wordpress Login Details and Settings:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
 			
 				f:group_box {
+					title = "License and Donation",
+					fill_horizontal = 1,
+					f:row {
+						f:static_text {
+							title = 'This Software is Freeware and only for non-commercial use.\nIf you like this Plugin please support me with a Donation. Thank you!.',
+							font = '<system/bold>'
+						},
+						f:push_button {    -- Button mit Callback-Aufruf, der den hash-value zur Authentifizierung prüft
+							title = "Donate",
+							height_in_lines = 3,
+							width_in_chars = 12,
+							tooltip = 'Donate Martin a coffee or a beer',
+							action = function () -- test the wp login
+								LrHttp.openUrlInBrowser( 'https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CQA6XZ7LUMBJQ' )
+							end
+						},
+						
+					},
+				},	
+
+				f:group_box {
 					title = "Login Settings",
+					fill_horizontal = 1,
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
 					
 					f:row {
-						fill_horizontal = true,				
+						--fill_horizontal = 1,				
 						f:push_button {    -- Button mit Callback-Aufruf, der den hash-value zur Authentifizierung prüft
 							title = "Test Login",
 							action = function( button ) -- test the wp login
@@ -53,7 +76,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 										Log( "Post Test failed" )
 										propertyTable.msgBox = "Login Test Returned failed. No Result"
 									end
-								end )
+								end )			
 							end
 						},
 					},
@@ -69,6 +92,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 				f:group_box {
 					title = "Settings for (First)-Sync with Wordpress",
+					fill_horizontal = 1,
 					f:row {
 		
 						f:checkbox {
@@ -126,7 +150,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 					f:row {
 						f:checkbox {
-							title = "Only Do Metadata at first Sync. WP Image Files will not touched if checked!",
+							title = "Only Do Metadata at First-Sync. WP Image Files will not be touched if checked!",
 							value = bind 'firstSyncDoMetaOnly',
 						},
 					},
@@ -144,7 +168,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 				f:group_box {
 					title = "Select Values-Settings for WP-Metadata. WARNING: No consistency check is done!",
-
+					fill_horizontal = 1,
 					f:column {
 						--place = 'overlapping',
 						--fill_horizontal = 1,
@@ -227,23 +251,44 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 end
 
 function updateExportStatus( propertyTable )
-	Log('updateExportStatus aufgerufen')
+	--Log('updateExportStatus aufgerufen')
 	local message = nil
-	local locp = ''
+	local msg = inspect(propertyTable.msgBox)
 
 	repeat
 		-- Use a repeat loop to allow easy way to "break" out.
 		-- (It only goes through once.)
 		
 		if propertyTable.doLocalCopy then
-			locp = ''
-			locp = propertyTable.localPath 
+			if propertyTable.localPath == '' then
+				message = 'empty path'
+			end
+			if #propertyTable.localPath > 255 then
+				message = 'path too long'
+			end
+			if string.match(propertyTable.localPath ,'[/*?"<>|§$%%~#@€=&\'µ°]') ~= nil then
+				message = 'wrong character'
+			end
+			if string.match(propertyTable.localPath,'[a-zA-Z]:\\.*') == nil and os=='WIN' then
+				message = 'wrong path'
+			end
 		end
-	
+
+		if msg ~= nil then
+			if string.match(msg,'error') then
+				message = 'siteURL failed'
+			end
+			if string.match(msg,'Not tested') then
+				message = 'Test siteURL required!'
+			end
+		end
+
+
+
 	until true
 	
 	if message then
-		Log(message)
+		--Log(message)
 		propertyTable.message = message
 		propertyTable.hasError = true
 		propertyTable.hasNoError = false
@@ -276,6 +321,7 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'LrMeta_to_WP', updateExportStatus )
 
 	propertyTable:addObserver( 'LRcap', updateExportStatus )
+	propertyTable:addObserver( 'msgBox', updateExportStatus )
 
 	updateExportStatus( propertyTable )
 	

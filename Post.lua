@@ -7,8 +7,8 @@ by Martin von Berg
 ------------- Debug ----------------------
 --require 'strict.lua'
 local inspect = require 'inspect'
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 
 ----------------------------------------
 
@@ -16,7 +16,8 @@ local LrHttp = import( 'LrHttp' )
 
 -- Check Login given in PublishSettings
 function CheckLogin( publishSettings ) 
-
+  LrMobdebug.on()
+	publishSettings.urlreadable = false
 	Log('Debug: ' .. tostring(logDebug))
 	
 	local ReturnTable = {} 
@@ -33,7 +34,9 @@ function CheckLogin( publishSettings )
 	Log('url: ' .. url)  -- Debugging
 	Log('hash-value: ' .. hash) -- Debugging
 
-	local result, headers = LrHttp.get( url ) -- GET-Anfrage ohne Auth
+	--local result, headers = LrHttp.get( url ) -- GET-Anfrage ohne Auth
+	local result, headers = LrHttp.post( url, '', {}, 'HEAD',2 ) -- GET-Anfrage ohne Auth
+	local headresp = inspect(headers)
 
 	if headers.status == 200 then
 		ReturnTable['warning'] = 'REST-API (GET) of site can be reached without PWD! Check OAuth!'
@@ -41,6 +44,9 @@ function CheckLogin( publishSettings )
        	result = JSON:decode(result)
     	local str = 'OK. GET-Req without Auth. blocked. Authorization required. ' -- .. result.message
 		ReturnTable['Authentification'] = str
+	elseif string.match(headresp, 'error') then
+		ReturnTable['error'] = 'Cannot reach Site. Check Site URL.'
+		Log('Site not found: ' .. headresp)
 	else
 		ReturnTable['error'] = 'Cannot Reach Site. Unknown Error'
 		Log('Site not reached: ' .. headers.status)
@@ -67,15 +73,16 @@ function CheckLogin( publishSettings )
 		local result, headers = LrHttp.get( url, httphead )
 		
 		if headers.status == 200 then
+			local wppluginName = 'wpcat[_-]json[_-]rest'
 			local str = inspect(result) -- JSON-Rückgabe für ein Image in str umwandeln
-			local i,j = string.find(result,'wpcat_json_rest') 
+			local i = string.match(result, wppluginName) 
 			local pluginstatus
 			local pluginversion
 
 			if i ~= nil then
 				result = JSON:decode(result) 
 				for k = 1, #result do
-					local m,n = string.find(result[k]['textdomain'],'wpcat_json_rest')
+					local m,n = string.find(result[k]['textdomain'], wppluginName)
 					if m~= nil then
 						pluginstatus = result[k]['status']
 						pluginversion = result[k]['version']
