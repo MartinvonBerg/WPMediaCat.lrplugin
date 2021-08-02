@@ -264,12 +264,28 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local restData = {}
 	local url = ''
 	local httphead
+	local mime = 'image/jpeg'
+	local dowebp = true
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
 	  return wpid, restData
 	end
-  
+	
+	if dowebp then
+		mime = 'image/webp'
+		local newfile = string.gsub( path, 'jpg', 'webp')
+		-- convert jpg file to webp with imagick. Must be installed
+		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
+		Log('Webp-CMD: ', cmd)
+		success = LrTasks.execute( cmd ) 
+		Log('Webp-Path: ', newfile)
+		filen = string.gsub( filen, 'jpg', 'webp' )
+		Log('Webp-file:', filen)
+		LrTasks.sleep(0.1)
+		path = newfile
+	end 
+
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
   
 	-- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
@@ -278,7 +294,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  httphead = {
 		{field='Authorization', value=hash},
 		{field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
-		{field='Content-Type', value='image/jpeg'},
+		{field='Content-Type', value=mime}, -- value für webp anpassen
 	  }
 	elseif folder ~= '' then
 	  --Header-Wert: Content-Disposition = attachment; filename=example.jpg OHNE Anführungszeichen!
@@ -286,7 +302,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  httphead = {
 		{field='Authorization', value=hash},
 		{field='Content-Disposition', value='attachment; filename=' .. filen},
-		{field='Content-Type', value='image/jpeg'},
+		{field='Content-Type', value=mime}, -- value für webp anpassen
 	  }
 	else
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
@@ -326,15 +342,31 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local restData = {}
+	local mime = 'image/jpeg'
+	local dowebp = true
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  return
 	end
+
+	if dowebp then
+		mime = 'image/webp'
+		local newfile = string.gsub( path, 'jpg', 'webp')
+		-- convert jpg file to webp with imagick. Must be installed
+		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
+		Log('Webp-CMD: ', cmd)
+		success = LrTasks.execute( cmd ) 
+		Log('Webp-Path: ', newfile)
+		filen = string.gsub( filen, 'jpg', 'webp' )
+		Log('Webp-file:', filen)
+		LrTasks.sleep(0.1)
+		path = newfile
+	end 
   
 	local httphead = {
 		{field='Authorization', value=hash},
 		{field='Content-Disposition', value='form-data; filename=' .. filen },
-		{field='Content-Type', value='image/jpeg'},
+		{field='Content-Type', value=mime},
 	}
   
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
@@ -589,9 +621,10 @@ function addToWPColl (collection, search, photos, all_collections, all_paths)
 end
 
 -- Update image_meta keys of Media File to WP-Media-Catalog via REST-API
+-- @param wpid number or integer the Wordpress id as integer
 function UpdateKeys( publishSettings, photometa, wpid ) 
 	local hash = 'Basic ' .. publishSettings['hash']
-	local restData = {}
+	-- local restData = {}
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
 	  return
@@ -602,11 +635,13 @@ function UpdateKeys( publishSettings, photometa, wpid )
 		{field='Content-Type', value='application/json'},
 	}
   
-  restData['image_meta'] = photometa
+  	-- restData['image_meta'] = photometa
 	local image_meta = JSON:encode(photometa)
   
 	  
 	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update_meta/" .. tostring(wpid)
+	Log('Url for image_meta: ', url)
+	Log('meta as json:', inspect(image_meta) )
 	  
 	local result, headers = LrHttp.post( url, image_meta, httphead )
   
@@ -635,4 +670,35 @@ function ResetCustomMeta (photo)
     photo:setPropertyForPlugin( _PLUGIN,'gallery',  '')
     --photo:setPropertyForPlugin( _PLUGIN,'order', '' )
   end )
+end
+
+function getWebpMetaData ( photo )
+
+	local aspect = photo:getRawMetadata( 'aspectRatio' )
+	local orientation = 0
+
+	if aspect > 1.0 then
+		orientation = 1
+	else
+		orientation = 0
+	end
+
+	local WebpPhotoMeta = { 
+		image_meta = {
+			aperture          = tostring( photo:getRawMetadata( 'aperture' ) ),
+			credit            = photo:getFormattedMetadata( 'artist' ),
+			camera            = photo:getFormattedMetadata( 'cameraModel' ),
+			caption           = photo:getFormattedMetadata( 'caption' ),
+			created_timestamp = tostring( 978307200 + photo:getRawMetadata( 'dateTimeOriginal' ) ),
+			copyright         = photo:getFormattedMetadata( 'copyright' ),
+			focal_length      = tostring( photo:getRawMetadata( 'focalLength35mm' ) ),
+			iso               = tostring( photo:getRawMetadata( 'isoSpeedRating' ) ),
+			shutter_speed     = string.sub( tostring( photo:getRawMetadata( 'shutterSpeed' ) ), 1, 10),
+			title             = photo:getFormattedMetadata( 'title' ),
+			orientation       = tostring( orientation ),
+			keywords          = strsplit( photo:getFormattedMetadata('keywordTagsForExport'), ', ' ) -- return keys as table
+		}
+	}
+	
+	return WebpPhotoMeta
 end

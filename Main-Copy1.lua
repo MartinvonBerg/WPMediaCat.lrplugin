@@ -118,6 +118,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local renderedPhoto = {}
   local notuploaded = {}
   local countnotuploaded = 0
+  local dowebp = true -- Achtung: Das wird mehrfach gesetzt
 
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -177,6 +178,9 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         credit = photo:getFormattedMetadata( 'artist' ),
         copyright = photo:getFormattedMetadata( 'copyright' ),
       }
+      -- get the meta data for webp images 
+      local WebpPhotoMeta = getWebpMetaData ( photo )
+         
 
       -- get REST-Meta-Data
       data = GetMedia(pseudoPublishSettings, wpid)  -- data = nil if wpid invalid or = 0
@@ -234,7 +238,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       
       
       
-      -- Feset Metadata if the photo is not valid, meaning the filenames do not match --> Force generation of new photo in WP-media-cat. Never overwrite
+      -- Reset Metadata if the photo is not valid, meaning the filenames do not match --> Force generation of new photo in WP-media-cat. Never overwrite
       if not validPhoto then
         wpid = 0
         photoMeta['gallery'] = ''
@@ -264,9 +268,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               result = 'none'
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else
-              -- update photo including keywords
+              -- update photo including keywords. This is always the case for webp-images
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+              
+              if dowebp then
+                UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, result )
+              end
+              
               -- write WP-dimensions of image to Custom-Metadata. 
               catalog:withWriteAccessDo( 'UpdateDimension', function ()
                 photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )
@@ -350,6 +359,10 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             ImageID  = 'WPSync' .. tostring(result) -- set to wpid --diese Nummer muss eineindeutig sein!
             -- fehlende LR-Metadaten in den WP Katalog schreiben
             WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
+            -- mit UpdateKeys die Metadaten für webp-Bilder ergänzen
+            if dowebp then
+               UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, result )
+            end
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben
             catalog:withWriteAccessDo( 'AddMetaData', function ()
               WriteCustomMetaData( pseudoPublishSettings, photo, data )
