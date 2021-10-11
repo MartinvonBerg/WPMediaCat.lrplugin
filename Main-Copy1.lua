@@ -25,6 +25,25 @@ if ii ~= nil then
   os = 'WIN'
 end
 
+-- check availability of ImageMagick on start-up 
+-- delete-file First
+local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+local filepath = p2 .. '\\LRTestImagick.txt'
+if LrFileUtils.exists( filepath ) then
+  LrFileUtils.delete( filepath )
+end
+-- do test for Imagemagick  -- TODO: Include cmd for MAC also!
+if os == 'WIN' then
+  local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
+end
+
+LrTasks.startAsyncTask( function( context )
+  Log (cmd)
+  LrTasks.execute( cmd ) 
+end 
+)
+
+
 ----- Debug -----------
 --logDebug = false
 --require 'strict'
@@ -69,6 +88,8 @@ exportServiceProvider.exportPresetFields = {
   { key = 'preCopy', default = 'Copy-'},
   { key = 'firstSyncDoMetaOnly', default = true},
   { key = 'LrMeta_to_WP', default = false},
+  { key = 'dowebp', default = false},
+  { key = 'webpStatus', default = 'not tested yet'},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'First-Sync with Wordpress. ' .. WPCatColl .. ' only!'
 exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
@@ -880,7 +901,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
 
 end
 
--- Diese Funktion wird nach "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
+-- Diese Funktion wird nach Programmstart und "Veröffentlichen" als erste aufgerufen, Warum und wofür ist unklar
 function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   --LrMobdebug.on()
   --logDebug = publishSettings.DebugMode
@@ -891,7 +912,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   Log('firstSyncDoMetaOnly : ' .. inspect(publishSettings.firstSyncDoMetaOnly))
   Log('LrMeta_to_WP : ' .. inspect(publishSettings.LrMeta_to_WP))
 
-	return {
+  return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
 		defaultCollectionCanBeDeleted = false,
 		canAddCollection = true,

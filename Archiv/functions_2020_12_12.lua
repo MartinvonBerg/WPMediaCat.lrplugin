@@ -551,7 +551,7 @@ function UpdateKeys( publishSettings, photometa, wpid )
 		{field='Content-Type', value='application/json'},
 	}
   
-  restData['image_meta'] = photometa
+	restData['image_meta'] = photometa
 	local image_meta = JSON:encode(photometa)
   
 	  

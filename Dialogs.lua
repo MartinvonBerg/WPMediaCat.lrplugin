@@ -9,6 +9,9 @@ local LrDialogs = import 'LrDialogs'
 local LrFunctionContext = import 'LrFunctionContext'
 local LrColor = import 'LrColor'
 local LrHttp = import 'LrHttp'
+local LrTasks = import 'LrTasks'
+local LrPathUtils = import 'LrPathUtils'
+local LrFileUtils = import 'LrFileUtils'
 local share = LrView.share
 require 'Post'
 local inspect = require 'inspect' 
@@ -244,6 +247,26 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					},		
 				},
 
+				f:group_box {
+					title = "Settings for File Upload",
+					fill_horizontal = 1,
+					f:row {
+		
+						f:checkbox {
+							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Convert Files to WEBP",
+							value = bind 'dowebp',
+						},
+		
+						f:edit_field {
+							value = bind 'webpStatus',
+							enabled = bind 'dowebp',
+							truncation = 'middle',
+							immediate = true,
+							fill_horizontal = 1,
+						},
+					},
+				}
+
 		},
 	}
 	
@@ -309,6 +332,8 @@ function dialogs.startDialog( propertyTable )
 	
 	propertyTable:addObserver( 'siteURL', checkURL )
 
+	propertyTable:addObserver( 'dowebp', checkWebpConversion )
+
 	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
 	propertyTable:addObserver( 'localPath', updateExportStatus )
 
@@ -345,6 +370,37 @@ function checkURL( propertyTable )
 	end	
 
 	propertyTable.msgBox = str
+end
+
+function checkWebpConversion( propertyTable )
+	-- body
+	Log( "checkWebpConversion: " .. propertyTable.webpStatus) -- Debugging
+	if propertyTable.dowebp then
+		--propertyTable.webpStatus = 'Activated. Tested!'
+		local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+		local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
+
+		-- TODO: Include cmd for MAC also!
+		LrTasks.startAsyncTask( function( context )
+			Log (cmd)
+			LrTasks.execute( cmd ) 
+		end
+		)
+
+		local filepath = p2 .. '\\LRTestImagick.txt'
+                
+		if not LrFileUtils.exists( filepath ) then
+			propertyTable.webpStatus = 'ImageMagick not installed. Webp conversion not possible!'
+			propertyTable.dowebp = false
+		else
+			propertyTable.webpStatus = 'ImageMagick installed!'
+		end
+		
+		-- local result = LrFileUtils.readFile( p2 .. '\\LRTestImagick.txt' )
+
+	else
+		propertyTable.webpStatus = 'De-Activated. Retest!'
+	end
 end
 
 -- Hilfsfunktion für den Dialog: Eingabefeld mit einheitlichen Parametern
