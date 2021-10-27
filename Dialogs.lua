@@ -257,12 +257,10 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							value = bind 'dowebp',
 						},
 		
-						f:edit_field {
-							value = bind 'webpStatus',
-							enabled = bind 'dowebp',
-							truncation = 'middle',
-							immediate = true,
-							fill_horizontal = 1,
+						f:static_text {
+							title = bind( 'webpStatus' ),
+							fill_horizontal = 0,
+							width_in_chars = 40,
 						},
 					},
 				}
@@ -378,15 +376,7 @@ function checkWebpConversion( propertyTable )
 	if propertyTable.dowebp then
 		--propertyTable.webpStatus = 'Activated. Tested!'
 		local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-		local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
-
-		-- TODO: Include cmd for MAC also!
-		LrTasks.startAsyncTask( function( context )
-			Log (cmd)
-			LrTasks.execute( cmd ) 
-		end
-		)
-
+		
 		local filepath = p2 .. '\\LRTestImagick.txt'
                 
 		if not LrFileUtils.exists( filepath ) then
@@ -395,11 +385,9 @@ function checkWebpConversion( propertyTable )
 		else
 			propertyTable.webpStatus = 'ImageMagick installed!'
 		end
-		
-		-- local result = LrFileUtils.readFile( p2 .. '\\LRTestImagick.txt' )
-
+	
 	else
-		propertyTable.webpStatus = 'De-Activated. Retest!'
+		propertyTable.webpStatus = 'WebP De-Activated. Check Installation if you tried to activate.'
 	end
 end
 

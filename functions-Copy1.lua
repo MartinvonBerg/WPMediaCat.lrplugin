@@ -265,7 +265,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local url = ''
 	local httphead
 	local mime = 'image/jpeg'
-	local dowebp = true
+	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
@@ -343,7 +343,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local filen = filename
 	local restData = {}
 	local mime = 'image/jpeg'
-	local dowebp = true
+	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  return

@@ -25,25 +25,6 @@ if ii ~= nil then
   os = 'WIN'
 end
 
--- check availability of ImageMagick on start-up 
--- delete-file First
-local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-local filepath = p2 .. '\\LRTestImagick.txt'
-if LrFileUtils.exists( filepath ) then
-  LrFileUtils.delete( filepath )
-end
--- do test for Imagemagick  -- TODO: Include cmd for MAC also!
-if os == 'WIN' then
-  local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
-end
-
-LrTasks.startAsyncTask( function( context )
-  Log (cmd)
-  LrTasks.execute( cmd ) 
-end 
-)
-
-
 ----- Debug -----------
 --logDebug = false
 --require 'strict'
@@ -139,7 +120,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local renderedPhoto = {}
   local notuploaded = {}
   local countnotuploaded = 0
-  local dowebp = true -- Achtung: Das wird mehrfach gesetzt
+  local dowebp = exportSettings.dowebp -- Achtung: Das wird mehrfach gesetzt
+  Log('webp-setting: ', dowebp)
 
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -911,6 +893,25 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   Log('LRcap : ' .. inspect(publishSettings.LRcap[1]))
   Log('firstSyncDoMetaOnly : ' .. inspect(publishSettings.firstSyncDoMetaOnly))
   Log('LrMeta_to_WP : ' .. inspect(publishSettings.LrMeta_to_WP))
+
+  -- check availability of ImageMagick on start-up 
+  -- delete-file First
+  local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+  local filepath = p2 .. '\\LRTestImagick.txt'
+  if LrFileUtils.exists( filepath ) then
+    LrFileUtils.delete( filepath )
+  end
+  
+  LrTasks.startAsyncTask( function(  )
+    local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+    
+    -- do test for Imagemagick  -- TODO: Include cmd for MAC also!
+    local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
+    
+    Log ('image ', cmd)
+    LrTasks.execute( cmd ) 
+  end 
+  )
 
   return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",
