@@ -121,7 +121,6 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local notuploaded = {}
   local countnotuploaded = 0
   local dowebp = exportSettings.dowebp -- Achtung: Das wird mehrfach gesetzt
-  Log('webp-setting: ', dowebp)
 
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -240,7 +239,6 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       end
       
       
-      
       -- Reset Metadata if the photo is not valid, meaning the filenames do not match --> Force generation of new photo in WP-media-cat. Never overwrite
       if not validPhoto then
         wpid = 0
@@ -276,7 +274,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
               
               if dowebp then
-                UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, result )
+                UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, wpid )
               end
               
               -- write WP-dimensions of image to Custom-Metadata. 
@@ -435,7 +433,7 @@ end
 -- called if somebody wants to move a published collection. This is not allowed. Delete first, create new collection and publish this one.
 function exportServiceProvider.reparentPublishedCollection( publishSettings, info )
   Log('reparentPublishedCollection aufgerufen')
-  error( '\nWarning: Function to move Collections not provided.\nPlugin works correctly. Don\'t worry.\nHowto:\n -Create New Collection and move photos manually. \n -Delete the collection you wanted to move then publish the new collection' )
+  error( '\nWarning: Function to move Collections not provided.\nPlugin works correctly. Don\'t worry.\nHowto:\n -Create New Collection and move photos manually. \n -Delete the collection you wanted to move and then publish the new collection' )
 end
 
 -- Sync with Wordpress: exportServiceProvider.titleForGoToPublishedCollection = 'Sync with Wordpress'

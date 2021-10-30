@@ -30,6 +30,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
 	--LrMobdebug.on()  
 	local success = false
+	local docaption = true -- TODO: Provide a setting for that. But only a global setting is possible. No case to case decision known.
   
 	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
 	  Log('WritephotoMetaToWp failed')
@@ -73,6 +74,10 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 			local str = 'caption=' .. v
 			url = url .. pre(n) .. str
 			n = n + 1
+			
+			if docaption then
+				url = url .. "&docaption=true"
+			end
 		end
 
 	  end
@@ -102,6 +107,10 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 			local str = 'caption=' .. v
 			url = url .. pre(n) .. str
 			n = n + 1
+
+			if docaption then
+				url = url .. "&docaption=true"
+			end
 		end		
 
       end
@@ -122,7 +131,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	  end
     
 	end
-  
+
 	if n>0 then
 	  	result, headers = LrHttp.post( url, '', httphead )
     
@@ -374,13 +383,13 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid)
 	  
 	local result, headers = LrHttp.post( url, imgfile, httphead )
-  
+	Log('UpdateMedia http-status: ', headers.status)
 	if headers.status == 200 then
 		result = JSON:decode(result)
 		--wpid = tonumber(result['id'])
 		--restData = ExtractDataFromREST(result)
 	else
-		  wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+		  wpid = 'Update Media Fault: ' .. tostring(headers.status .. ' : ' .. filen)
 	end
 	
 	return wpid, result
@@ -624,8 +633,7 @@ end
 -- @param wpid number or integer the Wordpress id as integer
 function UpdateKeys( publishSettings, photometa, wpid ) 
 	local hash = 'Basic ' .. publishSettings['hash']
-	-- local restData = {}
-  
+	  
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
 	  return
 	end
@@ -637,20 +645,19 @@ function UpdateKeys( publishSettings, photometa, wpid )
   
   	-- restData['image_meta'] = photometa
 	local image_meta = JSON:encode(photometa)
-  
-	  
+	Log('WPid: ', wpid)
 	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update_meta/" .. tostring(wpid)
 	Log('Url for image_meta: ', url)
 	Log('meta as json:', inspect(image_meta) )
 	  
 	local result, headers = LrHttp.post( url, image_meta, httphead )
-  
+	Log('UpdateKeys http-status: ', headers.status)
 	if headers.status == 200 then
 		result = JSON:decode(result)
 		--wpid = tonumber(result['id'])
 		--restData = ExtractDataFromREST(result)
 	else
-		  wpid = 'Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+		  wpid = 'Update Key Fault: ' .. tostring(headers.status)
 	end
 	
 	return wpid, result
