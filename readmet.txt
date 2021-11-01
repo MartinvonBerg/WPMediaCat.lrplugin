@@ -1,3 +1,5 @@
+TODO: update and rework as MD-file
+
 Preparation (prior to Installation)
 
 !!! IMPORTANT !!!

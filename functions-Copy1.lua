@@ -30,7 +30,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4474?alt_text=alternate-text
 	--LrMobdebug.on()  
 	local success = false
-	local docaption = true -- TODO: Provide a setting for that. But only a global setting is possible. No case to case decision known.
+	local docaption = publishSettings['doCaption']
   
 	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
 	  Log('WritephotoMetaToWp failed')
@@ -259,6 +259,7 @@ end
   
 -- Add Media File to WP-Media-Catalog via REST-API
 function AddNewMedia( publishSettings, filename, path, defaultcoll, folder ) 
+--LrMobdebug.on()
 	-- Folgende Annahmen: Nach dem ersten SYNC wird mit WP nicht mehr im Media-Cat gearbeitet. NIE!
 	-- Auch mit FTP wird nicht mehr hochgeladen. NIE!
 	-- Nur dann, KANN es keine Dateien geben, die zwar im Folder sind aber noch nicht in WP sind oder LR nicht zugeordnet wurden, d.h. WP und LR sind dann immer synchron.
@@ -266,7 +267,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	-- Bei GET: Liefert alle WPIDs zu allen Original-Files im Folder. Zusätzlich werden alle Dateien, die nicht in WP sind gelistet als eigener Key in der REST-Antwort
 	-- Bei POST mit addtofolder, wird mit dem JPG-Body das WP-Bild mit WPID entweder updated oder ohne WPID die bestehende JPG-Datei überschrieben und dann zu WP ergänzt
 	-- In beiden Fällen bei POST wird die WPID als ID zurückgeliefert und der Ablauf in LR-LUA in dieser Funktion kann gleichbleiben! 
-	
+	Log('AddNewMedia called')
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local wpid = 0
@@ -287,7 +288,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		-- convert jpg file to webp with imagick. Must be installed
 		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
 		Log('Webp-CMD: ', cmd)
-		success = LrTasks.execute( cmd ) 
+		LrTasks.execute( cmd ) 
 		Log('Webp-Path: ', newfile)
 		filen = string.gsub( filen, 'jpg', 'webp' )
 		Log('Webp-file:', filen)
@@ -364,7 +365,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		-- convert jpg file to webp with imagick. Must be installed
 		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
 		Log('Webp-CMD: ', cmd)
-		success = LrTasks.execute( cmd ) 
+		LrTasks.execute( cmd ) 
 		Log('Webp-Path: ', newfile)
 		filen = string.gsub( filen, 'jpg', 'webp' )
 		Log('Webp-file:', filen)
@@ -379,8 +380,8 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	}
   
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
-	  
-	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid)
+	-- changemime is added always, just in case. It does not disturb if not required.  
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid) .. "?changemime=true"
 	  
 	local result, headers = LrHttp.post( url, imgfile, httphead )
 	Log('UpdateMedia http-status: ', headers.status)
@@ -452,7 +453,7 @@ function DeleteMedia( publishSettings, wpmediaid )
 	
 	  url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
 	--http://127.0.0.1/wordpress/wp-json/wp/v2/media/3439?force=1
-	--http-methode: delete   
+	--http-method: delete   
 	  local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
   
 	  if headers.status == 200 then

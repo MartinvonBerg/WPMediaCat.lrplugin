@@ -19,11 +19,16 @@ local LrSystemInfo = import 'LrSystemInfo'
 local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
 local WPCatColl = 'WPCat'
 
-local os = LrSystemInfo.osVersion()
+---- Get sytem and Lightroom information
+local os = LrSystemInfo.osVersion() -- TODO
 local ii,j = string.find(os,'indows') -- den vollen Filename suchen
 if ii ~= nil then
   os = 'WIN'
 end
+local version = LrApplication.versionTable()
+local LRVmajor = version['major']
+local LRVminor = version['minor']
+local LRVrevis = version['revision']
 
 ----- Debug -----------
 --logDebug = false
@@ -70,6 +75,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'firstSyncDoMetaOnly', default = true},
   { key = 'LrMeta_to_WP', default = false},
   { key = 'dowebp', default = false},
+  { key = 'doCaption', default = false},
   { key = 'webpStatus', default = 'not tested yet'},
 }
 exportServiceProvider.titleForGoToPublishedCollection = 'First-Sync with Wordpress. ' .. WPCatColl .. ' only!'
@@ -207,12 +213,22 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         base4search = '^' .. string.gsub( wpBaseFileName, "[-_]","[-_]") -- base : wordpress
       end
 
+      -- Feature SafeMode: Es wird eine neue WPID erstellt, wenn filename und base4search NICHT übereinstimmen.
+      -- Oder: Nur wenn die beiden übereinstimmen wird das Bild mit der bereits vergegbenen WPID aktualisiert.
+      -- Die Umbennennung von Bildern NACH der Veröffentlichung ist damit nicht möglich.
+
+      -- Feature OverWriteMode: Dateien können mit derselben WPID umbenannt werden. Es wird keine neuen WPID vergeben.
+      -- Realisiert mit result2 = 'overwrite'
+
       if lrcopyname ~= nil and base4search ~= nil then
-        result1 = string.match(lrcopyname, base4search) -- lrcopyname kann auch leer sein, d.h.nil
+        result1 = string.match(lrcopyname, base4search) -- lrcopyname kann auch leer sein, d.h.nil. Das ist meistens der Fall --> result1 = nil
       end
 
       if base4search ~= nil then
         result2 = string.match(filename, base4search)
+        -- OverWriteMode. TODO: Decide whether to provide a setting for that.
+        -- SafeMode: Uncomment this line.
+        result2 = 'overwrite'
       end 
 
       if result1 ~= nil or result2 ~= nil then
@@ -350,8 +366,10 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               
       elseif tonumber(wpid) == 0 then -- add new image to WP Media Catalog
           if progressScope:isCanceled() then progressScope:cancel() end 
-          Log(i ..' Adding File: ' .. filename .. ' to WP')
+          Log('Photo ' .. i ..': Adding File: ' .. filename .. ' to WP')
           Log('Rendition-Datei: ' .. renditionFilePath)
+          Log('Folder: ' .. folder)
+          Log('Collec: ' .. tostring(defaultcoll) )
           
           local result = 'none'
           result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder ) -- Einschränkungen siehe dort!
@@ -413,17 +431,18 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   end
   local arraytostring = inspect(sub)
 
-  for _, pp in pairs(publishedPhotos) do
-    local remoteId = pp:getRemoteId()
-    local ii,j = string.find(arraytostring, remoteId) -- den vollen Filename suchen
+  if LRVmajor == 6 then
+    for _, pp in pairs(publishedPhotos) do
+      local remoteId = pp:getRemoteId()
+      local ii,j = string.find(arraytostring, remoteId) -- den vollen Filename suchen
 
-    if ii ~= nil then
-      Log('set edit flag: ', remoteId)
-      catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
-        pp:setEditedFlag(false)
-      end)
+      if ii ~= nil then
+        Log('set edit flag: ', remoteId)
+        catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
+          pp:setEditedFlag(false)
+        end)
+      end
     end
-
   end
   ------------------------ End set edited flag
 
@@ -891,6 +910,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   Log('LRcap : ' .. inspect(publishSettings.LRcap[1]))
   Log('firstSyncDoMetaOnly : ' .. inspect(publishSettings.firstSyncDoMetaOnly))
   Log('LrMeta_to_WP : ' .. inspect(publishSettings.LrMeta_to_WP))
+  Log('OS: ' .. os .. ' LR-Version: ' .. LRVmajor .. '.' .. LRVminor .. '.' .. LRVrevis .. '.' )
 
   -- check availability of ImageMagick on start-up 
   -- delete-file First

@@ -94,6 +94,24 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 				},	
 
 				f:group_box {
+					title = "Settings for File Upload",
+					fill_horizontal = 1,
+					f:row {
+		
+						f:checkbox {
+							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Convert Files to WEBP",
+							value = bind 'dowebp',
+						},
+		
+						f:static_text {
+							title = bind( 'webpStatus' ),
+							fill_horizontal = 0,
+							width_in_chars = 40,
+						},
+					},
+				},
+
+				f:group_box {
 					title = "Settings for (First)-Sync with Wordpress",
 					fill_horizontal = 1,
 					f:row {
@@ -164,8 +182,6 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							value = bind 'LrMeta_to_WP',
 						},
 					},
-
-										
 
 				},
 
@@ -244,27 +260,22 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								value = bind 'LRcap',
 							}
 						},
-					},		
-				},
-
-				f:group_box {
-					title = "Settings for File Upload",
-					fill_horizontal = 1,
+					},	
+					
 					f:row {
-		
 						f:checkbox {
-							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Convert Files to WEBP",
-							value = bind 'dowebp',
-						},
-		
-						f:static_text {
-							title = bind( 'webpStatus' ),
-							fill_horizontal = 0,
-							width_in_chars = 40,
+							title = "Update caption for all Images with LR caption",
+							value = bind 'doCaption',
 						},
 					},
-				}
 
+					f:row {
+						f:static_text {
+							title = "All means: Works for Gutenberg images, galleries and images with text. Their captions will be identical.",
+							
+						},
+					},
+				},
 		},
 	}
 	
