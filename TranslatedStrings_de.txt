@@ -1,0 +1,5 @@
+"$$$/WP_MediaCat2/PluginName=WP_MediaCat2-DE"
+"$$$/WP_MediaCat2/WP_MediaCat2-title=WP_MediaCat2-DE"
+"$$$/WP_MediaCat2/FirstSync=Synchronisiere erstmalig mit WordPress"
+"$$$/WP_MediaCat2/only=Nur für "
+"$$$/WP_MediaCat2/CopyToClip=Kopiere WordPress-Code in Zwischenablage"

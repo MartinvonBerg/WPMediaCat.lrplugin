@@ -23,7 +23,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	-- photoMeta: Tabelle mit Metadaten als key-value-pair
 	-- publishSettings: Tabelle ähnlich den Lr-Lua-PublishSettings, hier aber kopiert, da Original nicht bereitsteht
 	-- LR caption kommt in den alt-tag und in die Beschreibung bzw. description.raw 
-	-- alt-tag leerlassen, wenn das Bild als dekoratives Element dient!
+	-- SEO: alt-tag leerlassen, wenn das Bild als dekoratives Element dient!
   
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?gallery=paularo&description=cat=paularo
 	-- Example: http-POST: http://127.0.0.1/wordpress/wp-json/wp/v2/media/4224?title=MPaul
@@ -31,9 +31,18 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	--LrMobdebug.on()  
 	local success = false
 	local docaption = publishSettings['doCaption']
+
+	if type(wpid) ~= 'string' then
+		wpid =  tostring(wpid)
+	end
   
-	if type(wpid) ~= 'number' or photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
-	  Log('WritephotoMetaToWp failed')
+	if photoMeta == {} or publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
+	  local phMeta = inspect( photoMeta)
+	  local id = inspect(wpid)	
+	  Log('WritephotoMetaToWp failed for ' .. id .. ' with type ' .. type(wpid) )
+	  Log('Meta was: ', phMeta)
+	  Log('hash ', publishSettings['hash'])
+	  Log('siteURL ', publishSettings['siteURL'])
 	  return success
 	end
   
@@ -45,7 +54,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	local result
 	local headers
     
-	local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+	local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. wpid
 	local WPalt = publishSettings['WPalt'][1]
 	local WPdescr = publishSettings['WPdescr'][1]
 	local WPcap = publishSettings['WPcap'][1]
@@ -53,11 +62,11 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	
 	for k, v in pairs(photoMeta) do
 		
-	  -- LR Caption (caption)	
+	  -- LR Caption (caption) to write into WordPress REST-Fields	
 	  if k == 'caption' and v ~= '' and v ~= nil and v ~= 'nil' then 
 		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
 
-		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		-- select which WP REST-Field will be filled with caption 
 		if WPalt == 'LRcap' then
 			local str = 'alt_text=' .. v
 			url = url .. pre(n) .. str
@@ -82,7 +91,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 
 	  end
 	  
-	  -- LR Title
+	  -- LR Title to write into WordPress REST-Fields
 	  if k == 'title' and v ~= '' and v ~= nil and v ~= 'nil' then 
 		v = urlencode(v) -- der wert muss für dt. Umlaute und leerzeichen encoded werden, aber nur der Wert!
 
@@ -90,7 +99,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 		url = url .. pre(n) .. str
 		n = n + 1
 
-		-- die WPxxx im if müssen vorher exklusive als LRcap oder LRtit gesetzt werden!
+		-- select which WP REST-Field will be filled with title
 		if WPalt == 'LRtit' then
 			local str = 'alt_text=' .. v
 			url = url .. pre(n) .. str

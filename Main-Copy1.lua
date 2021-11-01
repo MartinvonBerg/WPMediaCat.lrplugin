@@ -13,17 +13,16 @@ local LrFunctionContext = import 'LrFunctionContext'
 --local LrMD5 = import 'LrMD5'
 local LrPhotoInfo = import 'LrPhotoInfo'
 --local LrSelection = import 'LrSelection'
-local LrSystemInfo = import 'LrSystemInfo'
+--local LrSystemInfo = import 'LrSystemInfo'
 
-
-local mypluginID = 'com.adobe.lightroom.export.wp_mediacat2' -- TODO: durch variable ersetzen
+local mypluginID = 'com.mvbplugins.lightroom.export.wp_mediacat2' 
 local WPCatColl = 'WPCat'
 
 ---- Get sytem and Lightroom information
-local os = LrSystemInfo.osVersion() -- TODO
-local ii,j = string.find(os,'indows') -- den vollen Filename suchen
-if ii ~= nil then
-  os = 'WIN'
+--local os = LrSystemInfo.osVersion() 
+--local ii,j = string.find(os,'indows') -- den vollen Filename suchen
+if WIN_ENV then
+  os = 'WIN' -- TODO: wird nur einmalig benutzt, dort WIN_ENV benutzen
 end
 local version = LrApplication.versionTable()
 local LRVmajor = version['major']
@@ -78,8 +77,8 @@ exportServiceProvider.exportPresetFields = {
   { key = 'doCaption', default = false},
   { key = 'webpStatus', default = 'not tested yet'},
 }
-exportServiceProvider.titleForGoToPublishedCollection = 'First-Sync with Wordpress. ' .. WPCatColl .. ' only!'
-exportServiceProvider.titleForGoToPublishedPhoto = 'Copy Wordpress-Code to Clip' --or 'Go to Foto in WP Catalog'
+exportServiceProvider.titleForGoToPublishedCollection = LOC "$$$/WP_MediaCat2/only=Only" .. WPCatColl .. ' : ' .. LOC "$$$/WP_MediaCat2/FirstSync=First-Sync with WordPress"
+exportServiceProvider.titleForGoToPublishedPhoto = LOC "$$$/WP_MediaCat2/CopyToClip=Copy Wordpress-Code to Clip" --or 'Go to Foto in WP Catalog'
 exportServiceProvider.disableRenamePublishedCollection = true -- benennt die Sammlung im Dienst um, erzeugt damit einen neuen Ordner
 exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den ganzen Dienst um
 ------------ exportServiceProvider ----------------------------
@@ -154,8 +153,9 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local WPalt = pseudoPublishSettings['WPalt'][1]
 	local WPdescr = pseudoPublishSettings['WPdescr'][1]
   local WPcap = pseudoPublishSettings['WPcap'][1]
+  --[[
   local metaMatch = false
-  
+  -- TODO: Decide to provide a setting for 'strict metadata handling'
   if ((LRcap == 'WPalt') and (WPalt == 'LRcap')) or ((LRcap == 'WPdescr') and (WPdescr == 'LRcap')) or ((LRcap == 'WPcap') and (WPcap == 'LRcap')) then 
     metaMatch = true
   else
@@ -165,6 +165,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     progressScope:done()
     return 
   end 
+  ]]
 
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     
@@ -228,7 +229,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         result2 = string.match(filename, base4search)
         -- OverWriteMode. TODO: Decide whether to provide a setting for that.
         -- SafeMode: Uncomment this line.
-        result2 = 'overwrite'
+        result2 = 'overwrite' -- will force validPhoto to true
       end 
 
       if result1 ~= nil or result2 ~= nil then
@@ -316,11 +317,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             else
               ImageID = '' -- photo wird als unpublished gesetzt
             end
-
+          --------------- firstSync ----------------------------------  
           elseif firstSync then
 
-            if firstSyncDoMetaOnly  then 
-              -- update keywords only later
+            if firstSyncDoMetaOnly then 
+              -- TODO: update keywords only later 
             else
               -- update photo including keywords
               result = 'none'
@@ -332,14 +333,15 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               end )
             end
 
+            -- MetaData is always synchronized independet of firstSyncDoMetaOnly
             if LrMeta_to_WP then
-              -- Meta: LR --> WP at firstSync (not tested)
+              -- Meta: LR --> WP at firstSync TODO: test this
               WritephotoMetaToWp( pseudoPublishSettings, wpid, photoMeta )
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else 
-              --Meta: WP --> LR  : WP-data in data
+              -- Meta: WP --> LR  : WP-data is in variable data
               -- Check propertyTable selection for LRcap 
-              local value = photo:getFormattedMetadata( 'caption' ) --fallback
+              local value = photo:getFormattedMetadata( 'caption' ) --fallback if the following does not provide a value
               if LRcap == 'WPalt'  then 
                 value = data.alt
               elseif LRcap == 'WPdescr' then
@@ -487,7 +489,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     firstsync = true -- Zugriff in processRenderedPhotos nur mit exportContext.propertyTable.firstsync
   end
   
-  -- Nur bei Firstsync also wenn die Collection leer ist
+  -- Nur bei Firstsync also wenn die Collection leer ist und wenn es die Haupt-Collection ist.
   if (firstsync == true and publishSettings.urlreadable == true and defaultcoll) then
     Log('Start First Sync')
     pscope:setPortionComplete(0.05)
@@ -658,14 +660,22 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       for nn=1,#mediatable do
         local photos = mediatable[nn].lrid
       
-        --if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png') and #photos == 0 then
-        if mediatable[nn].mime == 'image/jpeg' and #photos == 0 then
+        if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png' or mediatable[nn].mime == 'image/webp') and #photos == 0 then
+        --if mediatable[nn].mime == 'image/jpeg' and #photos == 0 then
           local newfilepath = copypath .. '\\' .. mediatable[nn].filen
           -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
 
             local newlrphoto = nil
-            Log('ADD-2-CAT: ' .. mediatable[nn].origurl .. ' -> ' .. newfilepath)
+            local downLoadUrl = mediatable[nn].origurl
+
+            -- check if shortened url are used in WordPress and add the site url if so
+            local url = publishSettings['siteURL'] 
+            local result = string.match( downLoadUrl, url )
+            if result == nil then
+              downLoadUrl = url .. downLoadUrl
+            end
+            Log('ADD-2-CAT: ' .. downLoadUrl .. ' -> ' .. newfilepath)
             
             --- AsyncTask zum herunterladen
             LrTasks.startAsyncTask(function ()
@@ -673,9 +683,11 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
                 {field='Content-Type', value=mediatable[nn].mime}, --- noch für png und gif erweitern
                 {field='Application', value='application/octet-stream'},
                 }
-              local newfilecontent, headers =LrHttp.get(mediatable[nn].origurl)
+              local newfilecontent, headers =LrHttp.get( downLoadUrl )
               local file = assert(io.open(newfilepath, "wb"))
-              file:write(newfilecontent)
+              if newfilecontent ~= nil then
+                file:write(newfilecontent)
+              end
               file:close()
             end )
           
@@ -914,6 +926,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
 
   -- check availability of ImageMagick on start-up 
   -- delete-file First
+  --[[
   local p2 = LrPathUtils.getStandardFilePath( 'documents' )
   local filepath = p2 .. '\\LRTestImagick.txt'
   if LrFileUtils.exists( filepath ) then
@@ -930,6 +943,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
     LrTasks.execute( cmd ) 
   end 
   )
+  ]]
 
   return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",

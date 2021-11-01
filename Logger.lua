@@ -5,6 +5,8 @@
 
 local LrLogger = import "LrLogger"
 local Logger = LrLogger( "WP_MediaCat3" ) 
+JSON=require 'JSON'
+
 logDebug = true
 -- log to logfile in ~/Documents/My Documents. Change this to 'print' to log to console
 Logger:enable( "logfile" )

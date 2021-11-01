@@ -64,7 +64,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 							title = "Test Login",
 							action = function( button ) -- test the wp login
 								Log( "Pressed Test Login button" )  -- Debugging
-								propertyTable.msgBox = ''
+								propertyTable.msgBox = 'Test started...'
 								LrFunctionContext.postAsyncTaskWithContext( "testPost", function( context ) 
 									local result = CheckLogin( propertyTable )
 									if result then
@@ -220,7 +220,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								height = 80,
 								width = 100,
 								allows_multiple_selection = false,
-								items = { {title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								items = { {title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, {title = "empty", value = 'empty'}, },
 								value = bind 'WPalt',
 							},
 
@@ -232,7 +232,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								height = 80,
 								width = 100,
 								allows_multiple_selection = false,
-								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, {title = "empty", value = 'empty'}, },
 								value = bind 'WPdescr',
 							},
 
@@ -244,7 +244,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								height = 80,
 								width = 100,
 								allows_multiple_selection = false,
-								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, },
+								items = {{title = "Caption", value = 'LRcap'}, {title = "Title", value = 'LRtit'}, {title = "empty", value = 'empty'}, },
 								value = bind 'WPcap',
 							},	
 
@@ -256,7 +256,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 								height = 80,
 								width = 120,
 								allows_multiple_selection = false,
-								items = { {title = "WP-alt_text", value = 'WPalt'}, {title = "WP-description", value = 'WPdescr'}, {title = "WP-caption", value = 'WPcap'},  },
+								items = { {title = "WP-alt_text", value = 'WPalt'}, {title = "WP-description", value = 'WPdescr'}, {title = "WP-caption", value = 'WPcap'}, {title = "empty", value = 'empty'}, },
 								value = bind 'LRcap',
 							}
 						},
@@ -286,6 +286,7 @@ function updateExportStatus( propertyTable )
 	--Log('updateExportStatus aufgerufen')
 	local message = nil
 	local msg = inspect(propertyTable.msgBox)
+	--Log('Msg: ', msg)
 
 	repeat
 		-- Use a repeat loop to allow easy way to "break" out.

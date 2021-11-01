@@ -16,7 +16,7 @@ local LrHttp = import( 'LrHttp' )
 
 -- Check Login given in PublishSettings
 function CheckLogin( publishSettings ) 
-  LrMobdebug.on()
+    --LrMobdebug.on()
 	publishSettings.urlreadable = false
 	Log('Debug: ' .. tostring(logDebug))
 	
