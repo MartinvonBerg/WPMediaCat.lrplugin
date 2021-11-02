@@ -9,22 +9,23 @@ local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
--- check availability of ImageMagick on start-up 
-local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-local filepath = p2 .. '\\LRTestImagick.txt'
-
--- delete-file First
-if LrFileUtils.exists( filepath ) then
-    LrFileUtils.delete( filepath )
-end
-
 -- checking whether ImageMagick command magick is available
 if WIN_ENV then
     Log('Running on Windows')
+
+    -- check availability of ImageMagick on start-up 
+    local p2 = LrPathUtils.getStandardFilePath( 'documents' ) -- MAC also
+    local filepath = p2 .. '\\LRTestImagick.txt' -- WIN only
+
+    -- delete-file First
+    if LrFileUtils.exists( filepath ) then
+        LrFileUtils.delete( filepath )
+    end
+
     LrTasks.startAsyncTask( function(  )
             local p2 = LrPathUtils.getStandardFilePath( 'documents' )
             
-            -- do test for Imagemagick  -- TODO: Include cmd for MAC also!
+            -- do test for availability Imagemagick 
             local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
             
             Log ('Checking ImageMagick: ', cmd)
@@ -33,4 +34,7 @@ if WIN_ENV then
     )
 else
     Log('Running on macOS')
+    -- Currently is no conversion from jpg to webp available
+    -- Ore more detailed: The installation of ImageMagick is quite complicated and only for developpers.
+    -- So we skip this for macOS. 
 end

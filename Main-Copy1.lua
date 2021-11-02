@@ -1,4 +1,6 @@
 --	Main entry point for plugin.
+-- TODO: Translation of all strings
+-- TODO: Update readme and search for beta-testers.
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
@@ -22,7 +24,9 @@ local WPCatColl = 'WPCat'
 --local os = LrSystemInfo.osVersion() 
 --local ii,j = string.find(os,'indows') -- den vollen Filename suchen
 if WIN_ENV then
-  os = 'WIN' -- TODO: wird nur einmalig benutzt, dort WIN_ENV benutzen
+  os = 'WIN'
+else
+  os = 'macOS'
 end
 local version = LrApplication.versionTable()
 local LRVmajor = version['major']
@@ -49,7 +53,9 @@ exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
 exportServiceProvider.hideSections = { 'exportLocation', 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
-exportServiceProvider.allowFileFormats = { 'JPEG' } 								-- TODO: alle Filetypen erlauben. evtl. Plugin von J.Friedl oder Ellis verwenden
+-- TODO: allow PNG also. Mind: The webp conversion should not run for that! But: Is it useful to use PNG? Files are much bigger with that.
+-- Some say that PNG is better for graphics. 
+exportServiceProvider.allowFileFormats = { 'JPEG' } 								
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
 exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
@@ -155,7 +161,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local WPcap = pseudoPublishSettings['WPcap'][1]
   --[[
   local metaMatch = false
-  -- TODO: Decide to provide a setting for 'strict metadata handling'
+  -- TODO: Decide to provide a setting for 'strict metadata handling'. If so, this outcommented part has to run in strict mode.
   if ((LRcap == 'WPalt') and (WPalt == 'LRcap')) or ((LRcap == 'WPdescr') and (WPdescr == 'LRcap')) or ((LRcap == 'WPcap') and (WPcap == 'LRcap')) then 
     metaMatch = true
   else
@@ -321,7 +327,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           elseif firstSync then
 
             if firstSyncDoMetaOnly then 
-              -- TODO: update keywords only later 
+              -- It is intentional that nothing happens here. Just here to avoid confusion why the if-then-else is not complete.
             else
               -- update photo including keywords
               result = 'none'
@@ -335,11 +341,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
             -- MetaData is always synchronized independet of firstSyncDoMetaOnly
             if LrMeta_to_WP then
-              -- Meta: LR --> WP at firstSync TODO: test this
+              -- Meta: LR --> WP at firstSync 
               WritephotoMetaToWp( pseudoPublishSettings, wpid, photoMeta )
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else 
-              -- Meta: WP --> LR  : WP-data is in variable data
+              -- Meta: WP --> LR  : WP-data is in variable 'data'.
+              -- Only done for titel and caption. Nothing more.
+              -- Mind this could be quite anoying if WP data is empty! If so, all titles and captions will be deleted in LR. So, to use with care!
+              -- TODO: Decide whether to handle keywords also. 
               -- Check propertyTable selection for LRcap 
               local value = photo:getFormattedMetadata( 'caption' ) --fallback if the following does not provide a value
               if LRcap == 'WPalt'  then 
@@ -349,6 +358,10 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               elseif LRcap == 'WPcap' then
                 value = data.caption
               end
+
+              -- sanitize the values ot have empty fields if WP values are empty and not 'nil'
+              if value == nil or value == 'nil' then value = '' end
+              if data.title == nil or data.title == 'nil' then data.title = '' end
 
               catalog:withWriteAccessDo( 'SetLRMetaData', function ()
                 photo:setRawMetadata( 'title', data.title )
@@ -544,6 +557,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     local sub
     local Level1 = {}
     local pscopeadd = (0.2 - 0.15) / #mediatable
+    local newfilepath
 
     ----------------------------------------------------------
     -- Suchlauf für alle Dateien : Pfade bestimmen
@@ -659,13 +673,22 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
       -- fotos herunterladen
       for nn=1,#mediatable do
         local photos = mediatable[nn].lrid
-      
-        if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png' or mediatable[nn].mime == 'image/webp') and #photos == 0 then
+        
+        -- Mind: Do NOT allow webp images because LR still can't handle this natively. So skip webp images.
+        -- This is problematic if the image is only available in webp. Thus it will not added to LR.
+        -- Could be solved by 'back-conversion' to jpg but sounds quite exhaustive.
+        if (mediatable[nn].mime == 'image/jpeg' or mediatable[nn].mime == 'image/png') and #photos == 0 then
         --if mediatable[nn].mime == 'image/jpeg' and #photos == 0 then
-          local newfilepath = copypath .. '\\' .. mediatable[nn].filen
+          if WIN_ENV then
+            newfilepath = copypath .. '\\' .. mediatable[nn].filen
+          else
+            -- Backslash unwandeln
+            local macname = string.gsub(mediatable[nn].filen, '\\', '/')
+            newfilepath = copypath .. '/' .. macname
+            Log('Macname: ', newfilepath)
+          end
           -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
-
             local newlrphoto = nil
             local downLoadUrl = mediatable[nn].origurl
 
@@ -800,7 +823,7 @@ function exportServiceProvider.goToPublishedPhoto( publishSettings, info )
   local wp = wpgall .. '    ' .. wpimage
   local copyCmd = "echo '".. wp .."' | pbcopy" -- MAC
 
-  if os == "WIN" then
+  if WIN_ENV then
          copyCmd = 'Echo '.. '"'.. wp.. '"' .. ' | clip'
   end
 
@@ -936,7 +959,7 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   LrTasks.startAsyncTask( function(  )
     local p2 = LrPathUtils.getStandardFilePath( 'documents' )
     
-    -- do test for Imagemagick  -- TODO: Include cmd for MAC also!
+    -- do test for Imagemagick  
     local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
     
     Log ('image ', cmd)

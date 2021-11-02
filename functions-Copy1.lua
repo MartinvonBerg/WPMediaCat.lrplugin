@@ -5,6 +5,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
+JSON=require 'JSON'
 
 
 ----- Debug -----------
@@ -171,7 +172,14 @@ function ExtractDataFromREST( restdata )
 	local row = {}
   	local lrid, fname, n
   
-	if restdata == nil or restdata == '' or restdata == 'nil' or restdata == {} or result[i].media_type == 'file' or result[i].mime_type == "image/x-icon"  then -- mime_type = \"image/x-icon\"
+	if restdata == nil 
+		or restdata == '' 
+		or restdata == 'nil' 
+		or restdata == {} 
+		or result[i].media_details == nil
+		or result[i].media_type == 'file' 
+		or result[i].mime_type == "image/x-icon"  
+	then -- mime_type = \"image/x-icon\"
 		return row
 	end
   
@@ -288,10 +296,11 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+	  Log('Added Media 1: ', wpid)
 	  return wpid, restData
 	end
 	
-	if dowebp then
+	if dowebp and WIN_ENV then
 		mime = 'image/webp'
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
@@ -325,20 +334,25 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  }
 	else
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+	  Log('Added Media 2: ', wpid)
 	  return wpid, restData
 	end
   
 	-- Create the image in Wordpress via REST-API according to the above settings
 	local result, headers = LrHttp.post( url, imgfile, httphead )
 	result = JSON:decode(result)
+	wpid = tonumber(result['id'])
+	Log('AddNewMedia url: ' .. url .. ' filen ' .. filen)
+	Log('http: ' .. inspect(headers.status) .. ' ID ' .. inspect(wpid))
+	Log('result: ' .. inspect(result))
   
 	-- Extract data from the Response to the Create-Request
-	  if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
-		wpid = tonumber(result['id'])
+	if headers.status == 201 and wpid ~= nil then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
+		--wpid = tonumber(result['id'])
 		restData = ExtractDataFromREST(result)
   
-	elseif headers.status == 200 then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
-		wpid = tonumber(result['id'])
+	elseif headers.status == 200 and wpid ~= nil then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
+		--wpid = tonumber(result['id'])
 		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
 		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
 		local httphead = {
@@ -352,7 +366,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		wpid = 'Upload: Fault during upload to WP: ' .. filen .. '.\nHeader-Status: ' .. tostring(headers.status) .. '\nMessage: ' .. result['message']
 	end
   
-	Log('Added Media: ', wpid)
+	Log('Added Media 3: ', inspect(wpid) )
 	return wpid, restData
 end
   
@@ -368,7 +382,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	  return
 	end
 
-	if dowebp then
+	if dowebp and WIN_ENV then
 		mime = 'image/webp'
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
@@ -407,7 +421,7 @@ end
   
 -- Get all Media Files / one Medie File from WP-Media-Catalog via REST-API. Provide response as JSON
 -- param: page : wenn nicht angegeben, dann muss perpage eine wpid sein!
--- TODO use param: fields : definiert die abzurufenden Felder mit ..../media/<wpid>?_fields=id,gallery,filen,MD5
+-- TODO use parameter _fields with request : ..../media/<wpid>?_fields=id,gallery,filen,MD5 to shorten the transferred data.
 function GetMedia( publishSettings, perpage, page ) 
   
 	local result = nil

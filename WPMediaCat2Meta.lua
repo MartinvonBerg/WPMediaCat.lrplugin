@@ -1,4 +1,5 @@
 --Definition der Metadaten für das Plug-in. Bei Änderungen muss die schemaversion hochgezählt werden!
+-- TODO: Is there a way to run several publish providers with different sets of Metadata for each 'instance'?
 return {
     schemaVersion = 8, -- increment this value any time you make a change to the field definitions below
    

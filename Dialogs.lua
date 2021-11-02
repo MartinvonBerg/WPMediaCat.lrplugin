@@ -21,7 +21,8 @@ dialogs = {}
 
 -- Definiert das Feld zu Beginn der Exporteinstellungen aufgerufen mit "Einstellungen bearbeiten ..."
 function dialogs.sectionsForTopOfDialog( f, propertyTable )
- --LrMobdebug.on()
+	Log('sectionsForTopOfDialog aufgerufen')
+    --LrMobdebug.on()
 	local bind = LrView.bind
 	propertyTable.msgBox = 'Not tested yet !'
 		
@@ -53,13 +54,13 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 				f:group_box {
 					title = "Login Settings",
-					fill_horizontal = 1,
+					
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
 					
 					f:row {
-						--fill_horizontal = 1,				
+									
 						f:push_button {    -- Button mit Callback-Aufruf, der den hash-value zur Authentifizierung prüft
 							title = "Test Login",
 							action = function( button ) -- test the wp login
@@ -158,17 +159,6 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 						},
 					},
 
-					--EntryBox( f, 'Prefix for virtual Copy:', 'preCopy'),
-
-					--[[            
-					f:row {
-						f:checkbox {
-							title = "Check for Test-Mode (not used!)",
-							value = bind 'DebugMode',
-						},
-					},
-					]]
-
 					f:row {
 						f:checkbox {
 							title = "Only Do Metadata at First-Sync. WP Image Files will not be touched if checked!",
@@ -189,8 +179,6 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 					title = "Select Values-Settings for WP-Metadata. WARNING: No consistency check is done!",
 					fill_horizontal = 1,
 					f:column {
-						--place = 'overlapping',
-						--fill_horizontal = 1,
 						f:row {
 							f:static_text {
 								fill_horizontal = 0,
@@ -279,6 +267,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 		},
 	}
 	
+	--Log('sectionsForTopOfDialog beendet')
 	return result
 end
 
@@ -291,7 +280,6 @@ function updateExportStatus( propertyTable )
 	repeat
 		-- Use a repeat loop to allow easy way to "break" out.
 		-- (It only goes through once.)
-		
 		if propertyTable.doLocalCopy then
 			if propertyTable.localPath == '' then
 				message = 'empty path'
@@ -299,12 +287,18 @@ function updateExportStatus( propertyTable )
 			if #propertyTable.localPath > 255 then
 				message = 'path too long'
 			end
-			if string.match(propertyTable.localPath ,'[/*?"<>|§$%%~#@€=&\'µ°]') ~= nil then
-				message = 'wrong character'
-			end
-			if string.match(propertyTable.localPath,'[a-zA-Z]:\\.*') == nil and os=='WIN' then
-				message = 'wrong path'
-			end
+			if WIN_ENV then
+				if string.match(propertyTable.localPath ,'[/*?"<>|§$%%~#@€=&\'µ°]') ~= nil then
+					message = 'wrong character'
+				end
+				if string.match(propertyTable.localPath,'[a-zA-Z]:\\.*') == nil then
+					message = 'wrong path'
+				end
+			else
+				if string.match(propertyTable.localPath ,'[*?"<>|§$%%~#@€=&\'µ°]') ~= nil then
+					message = 'wrong character'
+				end
+			end	
 		end
 
 		if msg ~= nil then
@@ -315,8 +309,6 @@ function updateExportStatus( propertyTable )
 				message = 'Test siteURL required!'
 			end
 		end
-
-
 
 	until true
 	
@@ -331,17 +323,18 @@ function updateExportStatus( propertyTable )
 		propertyTable.hasError = false
 		propertyTable.hasNoError = true
 		propertyTable.LR_cantExportBecause = nil
-	end
 	
+	end
+	--Log('updateExportStatus beendet')
 end
 
 -- wird bei Beginn des Dialogs aufgerufen
 -- registriert einen Observer, der bei Änderungen im Feld die genannte Funktion aufruft
 function dialogs.startDialog( propertyTable )
-	Log('startDialog aufgerufen')
+	--Log('startDialog aufgerufen')
 	
 	propertyTable:addObserver( 'siteURL', checkURL )
-
+	
 	propertyTable:addObserver( 'dowebp', checkWebpConversion )
 
 	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
@@ -359,6 +352,7 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'msgBox', updateExportStatus )
 
 	updateExportStatus( propertyTable )
+	--Log('startDialog beendet')
 	
 end
 
@@ -401,11 +395,16 @@ function checkWebpConversion( propertyTable )
 	else
 		propertyTable.webpStatus = 'WebP De-Activated. Check Installation if you tried to activate.'
 	end
+
+	if MAC_ENV then
+		propertyTable.webpStatus = 'Not for macOS! Webp conversion not possible!'
+		propertyTableq.dowebp = false 
+	end
 end
 
 -- Hilfsfunktion für den Dialog: Eingabefeld mit einheitlichen Parametern
 function EntryBox( f, title, bound)
-
+	--Log('EntryBox aufgerufen')
 	local bind = LrView.bind
 	local share = LrView.share
 
@@ -422,5 +421,5 @@ function EntryBox( f, title, bound)
 			width = 400
 		},
 	}
-
+	
 end
