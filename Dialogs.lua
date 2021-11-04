@@ -390,7 +390,15 @@ function checkWebpConversion( propertyTable )
 			propertyTable.webpStatus = 'ImageMagick not installed. Webp conversion not possible!'
 			propertyTable.dowebp = false
 		else
-			propertyTable.webpStatus = 'ImageMagick installed!'
+			local attr = LrFileUtils.fileAttributes( filepath )
+			local size = attr['fileSize']
+			Log('Test filesize: ', size)
+			if size > 50 then
+				propertyTable.webpStatus = 'ImageMagick installed!'
+			else
+				propertyTable.webpStatus = 'ImageMagick not executable. Webp conversion not possible!'
+				propertyTable.dowebp = false
+			end
 		end
 	
 	else
