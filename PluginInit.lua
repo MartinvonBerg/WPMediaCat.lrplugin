@@ -37,12 +37,13 @@ end
 
 LrTasks.startAsyncTask( function(  )
         local p2 = LrPathUtils.getStandardFilePath( 'documents' )
+        local cmd = ''
         
         -- do test for availability Imagemagick 
         if WIN_ENV then
-            local cmd = 'magick -version > "' .. p2 .. DIRSEP ..'LRTestImagick.txt"' 
+            cmd = 'magick -version > "' .. p2 .. DIRSEP ..'LRTestImagick.txt"' 
         else
-            local cmd = 'magick -version > ' .. p2 .. DIRSEP ..'LRTestImagick.txt' 
+            cmd = 'magick -version > ' .. p2 .. DIRSEP ..'LRTestImagick.txt' 
         end
         
         Log ('Checking ImageMagick: ', cmd)

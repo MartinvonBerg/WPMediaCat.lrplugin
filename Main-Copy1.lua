@@ -440,13 +440,18 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local arraytostring = inspect(sub)
 
   if LRVmajor > 5 then
-    for _, pp in pairs(publishedPhotos) do
+    for _, pp in pairs(publishedPhotos) do -- pp ist vom type LrPublishedPhoto. Hier kann also RemoteId und url gesetzt werden
       local remoteId = pp:getRemoteId()
       local ii,j = string.find(arraytostring, remoteId) -- den vollen Filename suchen
+      local url = pseudoPublishSettings['siteURL']
 
       if ii ~= nil then
         Log('set edit flag: ', remoteId)
+        local wpid = string.gsub( tostring(remoteId), 'WPSync', '')
+        url = url .. '/wp-admin/post.php?post=' .. wpid .. '&action=edit'
         catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
+          pp:setRemoteId( wpid )
+          pp:setRemoteUrl( url)
           pp:setEditedFlag(false)
         end)
       end
