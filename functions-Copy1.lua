@@ -291,7 +291,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local restData = {}
 	local url = ''
 	local httphead
-	local mime = getMime( filen )
+	local mime = 'image/jpeg'
 	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -300,11 +300,16 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  return wpid, restData
 	end
 	
-	if dowebp and WIN_ENV and mime == 'image/jpeg' then
+	if dowebp then
 		mime = 'image/webp'
+		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
-		local cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
+		if WIN_ENV then
+			cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
+		else
+			cmd = "magick" .. path .. "-quality 7 -define webp:auto-filter=true" .. newfile
+		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
 		Log('Webp-Path: ', newfile)
@@ -376,18 +381,24 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local restData = {}
-	local mime = getMime( filen )
+	local mime = 'image/jpeg'
 	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  return
 	end
 
-	if dowebp and WIN_ENV and mime == 'image/jpeg' then
+	if dowebp then
 		mime = 'image/webp'
+		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
-		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
+		if WIN_ENV then
+			cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
+		else
+			cmd = "magick" .. path .. "-quality 7 -define webp:auto-filter=true" .. newfile
+		end
+
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
 		Log('Webp-Path: ', newfile)

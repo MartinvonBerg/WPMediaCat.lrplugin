@@ -1,6 +1,5 @@
 --	Main entry point for plugin.
 -- TODO: Translation of all strings
--- TODO: Update readme and search for beta-testers.
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
@@ -681,6 +680,7 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
             newfilepath = copypath .. '/' .. macname
             Log('Macname: ', newfilepath)
           end
+
           -- nur speichern, wenn datei nicht existiert
           if not LrFileUtils.exists( newfilepath ) then
             local newlrphoto = nil
