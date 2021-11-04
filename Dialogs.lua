@@ -379,11 +379,12 @@ end
 function checkWebpConversion( propertyTable )
 	-- body
 	Log( "checkWebpConversion: " .. propertyTable.webpStatus) -- Debugging
+	
 	if propertyTable.dowebp then
 		--propertyTable.webpStatus = 'Activated. Tested!'
 		local p2 = LrPathUtils.getStandardFilePath( 'documents' )
 		
-		local filepath = p2 .. '\\LRTestImagick.txt'
+		local filepath = p2 .. DIRSEP .. 'LRTestImagick.txt'
                 
 		if not LrFileUtils.exists( filepath ) then
 			propertyTable.webpStatus = 'ImageMagick not installed. Webp conversion not possible!'
@@ -396,10 +397,10 @@ function checkWebpConversion( propertyTable )
 		propertyTable.webpStatus = 'WebP De-Activated. Check Installation if you tried to activate.'
 	end
 
-	if MAC_ENV then
-		propertyTable.webpStatus = 'Not for macOS! Webp conversion not possible!'
-		propertyTableq.dowebp = false 
-	end
+	--if MAC_ENV then
+	--	propertyTable.webpStatus = 'Not for macOS! Webp conversion not possible!'
+	--	propertyTableq.dowebp = false 
+	--end
 end
 
 -- Hilfsfunktion für den Dialog: Eingabefeld mit einheitlichen Parametern
