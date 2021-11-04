@@ -28,8 +28,8 @@ local LRVrevis = version['revision']
 --require 'strict'
 --require 'Logger'
 --local DebugSync = false
-local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
-LrMobdebug.start()
+--local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+--LrMobdebug.start()
 --local inspect = require 'inspect'
 ----- Debug ------------
 --LrMobdebug.on()
@@ -47,7 +47,7 @@ local WPCatColl = 'WPCat'
 exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.hideSections = { 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
+exportServiceProvider.hideSections = { 'exportLocation', 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
 exportServiceProvider.allowFileFormats = { 'JPEG' } 								
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
