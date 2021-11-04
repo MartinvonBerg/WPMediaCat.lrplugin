@@ -1,6 +1,7 @@
 -- Initialization Routine running at plugin loading
 -- Define globals: load the file with globals 
 require('PluginGlobals')
+JSON=require 'JSON'
 
 ----- Debug -----------
 logDebug = true
@@ -14,17 +15,19 @@ local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
-local p2 = LrPathUtils.getStandardFilePath( 'documents' ) -- MAC also
-
+-- os dependent settings as globals
 if WIN_ENV then
     Log('Running on Windows')
     DIRSEP = '\\'
+    os = 'WIN'
 else
     Log('Running on macOS')
     DIRSEP = '/'
+    os = 'macOS'
 end
 
 -- check availability of ImageMagick on start-up 
+local p2 = LrPathUtils.getStandardFilePath( 'documents' ) 
 local filepath = p2 .. DIRSEP .. 'LRTestImagick.txt'
 
 -- delete-file First

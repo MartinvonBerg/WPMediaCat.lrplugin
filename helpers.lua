@@ -95,9 +95,12 @@ function getMime(file)
     local mime = 'image/jpeg'
     base = getfile(file)
     base, ext = SplitFilename(base)
+    ext = string.lower( ext )
 
     if ext == 'png' then
-        mime = 'image/jpeg'
+        mime = 'image/png'
+    elseif ext == 'webp'  then
+        mime = 'image/webp'
     end
 
     return mime

@@ -14,7 +14,7 @@ local LrPathUtils = import 'LrPathUtils'
 local LrFileUtils = import 'LrFileUtils'
 local share = LrView.share
 require 'Post'
-local inspect = require 'inspect' 
+--local inspect = require 'inspect' 
 ----------------------------------------
 
 dialogs = {}

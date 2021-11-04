@@ -13,11 +13,11 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrPhotoInfo = import 'LrPhotoInfo'
 
 ---- Get sytem and Lightroom version information
-if WIN_ENV then
-  os = 'WIN'
-else
-  os = 'macOS'
-end
+--if WIN_ENV then
+--  os = 'WIN'
+--else
+--  os = 'macOS'
+--end
 local version = LrApplication.versionTable()
 local LRVmajor = version['major']
 local LRVminor = version['minor']
@@ -28,14 +28,14 @@ local LRVrevis = version['revision']
 --require 'strict'
 --require 'Logger'
 --local DebugSync = false
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
+local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
+LrMobdebug.start()
 --local inspect = require 'inspect'
 ----- Debug ------------
 --LrMobdebug.on()
 
 -- load and define external ressources
-JSON=require 'JSON'
+--JSON=require 'JSON'
 require 'Dialogs'
 require 'helpers'
 require 'functions-Copy1'
@@ -47,11 +47,8 @@ local WPCatColl = 'WPCat'
 exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = 'only'
 exportServiceProvider.small_icon = "Small-icon.png"
-exportServiceProvider.hideSections = { 'exportLocation', 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
--- TODO: allow PNG also. Mind: The webp conversion should not run for that! But: Is it useful to use PNG? Files are much bigger with that.
--- Some say that PNG is better for graphics. 
--- Mind: This is a general setting! One cant't decide one a case to case basis.
-exportServiceProvider.allowFileFormats = { 'JPEG', 'PNG' } 								
+exportServiceProvider.hideSections = { 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
+exportServiceProvider.allowFileFormats = { 'JPEG' } 								
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
 exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in
@@ -202,6 +199,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       local renditionFilePath = LrPathUtils.standardizePath( pathOrMessage ) -- Der Anhang -scaled wird von WP automatisch ergänzt
       local dimensions = LrPhotoInfo.fileAttributes( renditionFilePath ) -- table: width, height
       local rendFileSize = mytonumber(LrFileUtils.fileAttributes( renditionFilePath )['fileSize'])
+      --local pathToOriginal = photo:getRawMetadata('path')
 
       -- check if photo is valid, with filename and copyname and regex for '_' and '-'
       local validPhoto = false
@@ -442,7 +440,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   end
   local arraytostring = inspect(sub)
 
-  if LRVmajor == 6 then
+  if LRVmajor > 5 then
     for _, pp in pairs(publishedPhotos) do
       local remoteId = pp:getRemoteId()
       local ii,j = string.find(arraytostring, remoteId) -- den vollen Filename suchen

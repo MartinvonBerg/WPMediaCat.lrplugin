@@ -1,5 +1,5 @@
 -- tagset for the plugin Metadata
--- Mind: Global 'PiName' is defined in Info.lua
+-- Mind: Global 'PiName' and 'TagsetName' is defined in Info.lua
 
 return {
     --title = LOC "$$$/WP_MediaCat2/Meta/TagsetTitle=WordPress-Meta",

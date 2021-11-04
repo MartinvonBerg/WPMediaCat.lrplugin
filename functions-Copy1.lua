@@ -5,7 +5,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
-JSON=require 'JSON'
+--JSON=require 'JSON'
 
 
 ----- Debug -----------
@@ -304,7 +304,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		mime = 'image/webp'
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
-		local cmd = "magick \"" .. path .. "\" -quality 50 -define webpauto-filtertrue \"" .. newfile .. "\"" 
+		local cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
 		Log('Webp-Path: ', newfile)
@@ -376,7 +376,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local restData = {}
-	local mime = 'image/jpeg'
+	local mime = getMime( filen )
 	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
