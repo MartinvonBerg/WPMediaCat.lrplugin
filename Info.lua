@@ -11,11 +11,11 @@ This file 'Info.lua' is just allowed to return the table, nothing more, so 'requ
 
 --ATTENTION: changing the LrToolkitIdentifier will reset all Data for the plugin! All Data will be lost!
 PiName = 'com.mvbplugins.lightroom.export.wp_mediacat2'
+TagsetName = 'WordPress-Meta'
 
 return {
 	LrSdkVersion = 6.0,
 	LrSdkMinimumVersion = 6.0, -- minimum SDK version required by this plug-in
-	--LrToolkitIdentifier = 'com.mvbplugins.lightroom.export.wp_mediacat2',
 	LrToolkitIdentifier = PiName,
 	LrPluginName = LOC "$$$/WP_MediaCat2/PluginName=WP_MediaCat2",
 	LrAlsoUseBuiltInTranslations = true, 
@@ -23,6 +23,7 @@ return {
 	LrInitPlugin = 'PluginInit.lua', 
 
 	LrMetadataProvider  = 'WPMediaCat2Meta.lua', -- Service zur Definition der Metadaten für dieses Plugin-In im angeg. lua-file
+	LrMetadataTagsetFactory = 'WpCatTagset.lua',
 	
 	LrExportServiceProvider = { -- Definition des Export-Service-Proiders von LR für dieses Plugin-In im angeg. lua-file
 		title = LOC "$$$/WP_MediaCat2/WP_MediaCat2-title=WP_MediaCat2",

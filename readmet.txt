@@ -94,7 +94,23 @@ De-Installation of the Plugins
 
 -        Standard procedure for Lightroom-Plugins (see LR Documentation) Nothing will be changed in the LR-database! The Metadata of the plugin will be restored in the LR-database for the case you come back later on.
 
- 
+Create further instancies of the Plugin to work with several websites
+
+Optional but highly recommended: Backup your LR database
+1. Create a new directory in the directory where your plugin code resides.
+2. Name this new dir to 'plugin2.lrdevplugin' or 'plugin2.lrplugin'.
+    IMPORTANT: Always use 'lrdevplugin' or 'lrplugin' after a dot at the end of the folder name.
+
+3.1 Change in Info.lua the string for variable 'PiName' to something like 'com.plugin2.wordpress.....' different to the one in plugin1.
+3.2 Change in Info.lua the string for variable 'TagsetName' to something like 'WP-Meta2' different to the one in plugin1.
+3.3 Do the same in the file 'PluginGlobals.lus'
+3.4 Store these changes
+
+4. Load and activate the 'new' plugin in LR from the folder of Step 2.
+5. Define the settings for that copy of the plugin to your 2nd / 3rd / ... WordPress site.
+6. Done.
+
+
 
 Bugs
 
