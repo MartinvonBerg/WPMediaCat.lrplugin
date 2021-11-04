@@ -86,6 +86,23 @@ function getfile(path, sep)
 	return path
 end
 
+-- get the mime_type of a file
+-- assuming only jpg or png files used for export and the real mime-type and file-extension match
+--  @param string file : the complete path or filename with extension
+--  @return string mime-type of the file 'mime/jpeg' or 'mime/png'
+function getMime(file)
+    local base = ''
+    local mime = 'image/jpeg'
+    base = getfile(file)
+    base, ext = SplitFilename(base)
+
+    if ext == 'png' then
+        mime = 'image/jpeg'
+    end
+
+    return mime
+end
+
 -- split string by given seperator
 function strsplit(string, sSeparator, nMax, bRegexp)
 	

@@ -1,9 +1,14 @@
 -- Initialization Routine running at plugin loading
+-- Define globals: load the file with globals 
+require('PluginGlobals')
 
 ----- Debug -----------
---logDebug = false
+logDebug = true
+--require 'strict'
 require 'Logger'
------ Debug -----------
+DebugSync = false
+inspect = require 'inspect'
+----- Debug ------------
 
 local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'

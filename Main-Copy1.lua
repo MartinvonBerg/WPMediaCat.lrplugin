@@ -10,19 +10,9 @@ local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
---local LrExportSession = import 'LrExportSession'
---local LrShell = import 'LrShell'
---local LrMD5 = import 'LrMD5'
 local LrPhotoInfo = import 'LrPhotoInfo'
---local LrSelection = import 'LrSelection'
---local LrSystemInfo = import 'LrSystemInfo'
 
-local mypluginID = 'com.mvbplugins.lightroom.export.wp_mediacat2' 
-local WPCatColl = 'WPCat'
-
----- Get sytem and Lightroom information
---local os = LrSystemInfo.osVersion() 
---local ii,j = string.find(os,'indows') -- den vollen Filename suchen
+---- Get sytem and Lightroom version information
 if WIN_ENV then
   os = 'WIN'
 else
@@ -36,17 +26,22 @@ local LRVrevis = version['revision']
 ----- Debug -----------
 --logDebug = false
 --require 'strict'
-require 'Logger'
-local DebugSync = false
+--require 'Logger'
+--local DebugSync = false
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 --LrMobdebug.start()
-local inspect = require 'inspect'
------ Debug -----------
+--local inspect = require 'inspect'
+----- Debug ------------
+--LrMobdebug.on()
 
+-- load and define external ressources
 JSON=require 'JSON'
 require 'Dialogs'
 require 'helpers'
 require 'functions-Copy1'
+
+local mypluginID = PiName 
+local WPCatColl = 'WPCat'
 
 ------------ exportServiceProvider ----------------------------
 exportServiceProvider = {}
@@ -55,7 +50,8 @@ exportServiceProvider.small_icon = "Small-icon.png"
 exportServiceProvider.hideSections = { 'exportLocation', 'fileNaming' } -- exportLocation erzeugt den Reiter "Speicherort für Export", evtl. imageSettings ergänzen
 -- TODO: allow PNG also. Mind: The webp conversion should not run for that! But: Is it useful to use PNG? Files are much bigger with that.
 -- Some say that PNG is better for graphics. 
-exportServiceProvider.allowFileFormats = { 'JPEG' } 								
+-- Mind: This is a general setting! One cant't decide one a case to case basis.
+exportServiceProvider.allowFileFormats = { 'JPEG', 'PNG' } 								
 exportServiceProvider.allowColorSpaces = { 'sRGB' }
 exportServiceProvider.hidePrintResolution = true									-- hide print res controls
 exportServiceProvider.canExportVideo = false 										-- video is not supported through this plug-in

@@ -1,18 +1,26 @@
 --[[----------------------------------------------------------------------------
 Info.lua : Dieses Lua-File wird vom Plug-In zuerst aufgerufen
 Summary information and definition of script-files for plug-in.
+
+Mind this note in the SDK manual:
+You can use the Plug-in Manager to add multiple plug-ins with the same identifier 'LrToolkitIdentifier', 
+but only one of them can be enabled at time. If you enable one, any other plug-in that shares the same plug-in ID 
+is automatically disabled.
+This file 'Info.lua' is just allowed to return the table, nothing more, so 'require' is not possible.
 ------------------------------------------------------------------------------]]
 
+--ATTENTION: changing the LrToolkitIdentifier will reset all Data for the plugin! All Data will be lost!
+PiName = 'com.mvbplugins.lightroom.export.wp_mediacat2'
+
 return {
-	
 	LrSdkVersion = 6.0,
 	LrSdkMinimumVersion = 6.0, -- minimum SDK version required by this plug-in
-	--changing the LrToolkitIdentifier will reset all Data for the plugin! All Data will be lost!
-	LrToolkitIdentifier = 'com.mvbplugins.lightroom.export.wp_mediacat2',
+	--LrToolkitIdentifier = 'com.mvbplugins.lightroom.export.wp_mediacat2',
+	LrToolkitIdentifier = PiName,
 	LrPluginName = LOC "$$$/WP_MediaCat2/PluginName=WP_MediaCat2",
-	LrAlsoUseBuiltInTranslations = true, --
+	LrAlsoUseBuiltInTranslations = true, 
 
-	LrInitPlugin = 'PluginInit.lua', --
+	LrInitPlugin = 'PluginInit.lua', 
 
 	LrMetadataProvider  = 'WPMediaCat2Meta.lua', -- Service zur Definition der Metadaten für dieses Plugin-In im angeg. lua-file
 	

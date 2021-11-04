@@ -10,11 +10,11 @@ JSON=require 'JSON'
 
 ----- Debug -----------
 --require 'strict'
-require 'Logger'
-local DebugSync = logDebug
+--require 'Logger'
+--local DebugSync = logDebug
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 --LrMobdebug.start()
-local inspect = require 'inspect'
+--local inspect = require 'inspect'
 ----- Debug -----------
 
 ---------------------------------------------------------
@@ -291,7 +291,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local restData = {}
 	local url = ''
 	local httphead
-	local mime = 'image/jpeg'
+	local mime = getMime( filen )
 	local dowebp = publishSettings['dowebp']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -300,7 +300,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	  return wpid, restData
 	end
 	
-	if dowebp and WIN_ENV then
+	if dowebp and WIN_ENV and mime == 'image/jpeg' then
 		mime = 'image/webp'
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
@@ -315,6 +315,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	end 
 
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
+	Log('Mime-type: ', mime)
   
 	-- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
 	if defaultcoll then  
@@ -382,7 +383,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	  return
 	end
 
-	if dowebp and WIN_ENV then
+	if dowebp and WIN_ENV and mime == 'image/jpeg' then
 		mime = 'image/webp'
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
@@ -714,13 +715,20 @@ function getWebpMetaData ( photo )
 		orientation = 0
 	end
 
+	local time = photo:getRawMetadata( 'dateTimeOriginal' )
+	if time == nil or time == '' or time == 'nil' then 
+		time = ''
+	else
+		time = tostring( 978307200 + time )
+	end
+
 	local WebpPhotoMeta = { 
 		image_meta = {
 			aperture          = tostring( photo:getRawMetadata( 'aperture' ) ),
 			credit            = photo:getFormattedMetadata( 'artist' ),
 			camera            = photo:getFormattedMetadata( 'cameraModel' ),
 			caption           = photo:getFormattedMetadata( 'caption' ),
-			created_timestamp = tostring( 978307200 + photo:getRawMetadata( 'dateTimeOriginal' ) ),
+			created_timestamp = time,
 			copyright         = photo:getFormattedMetadata( 'copyright' ),
 			focal_length      = tostring( photo:getRawMetadata( 'focalLength35mm' ) ),
 			iso               = tostring( photo:getRawMetadata( 'isoSpeedRating' ) ),
