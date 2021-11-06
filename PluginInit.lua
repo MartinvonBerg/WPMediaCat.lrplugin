@@ -29,6 +29,7 @@ end
 -- check availability of ImageMagick on start-up 
 local p2 = LrPathUtils.getStandardFilePath( 'documents' ) 
 local filepath = p2 .. DIRSEP .. 'LRTestImagick.txt'
+pipath = _PLUGIN.path
 
 -- delete-file First
 if LrFileUtils.exists( filepath ) then
@@ -43,7 +44,7 @@ LrTasks.startAsyncTask( function(  )
         if WIN_ENV then
             cmd = 'magick -version > "' .. p2 .. DIRSEP ..'LRTestImagick.txt"' 
         else
-            cmd = 'magick -version > ' .. p2 .. DIRSEP ..'LRTestImagick.txt' 
+            cmd = pipath .. '/magick -version > ' .. p2 .. DIRSEP ..'LRTestImagick.txt' 
         end
         
         Log ('Checking ImageMagick: ', cmd)

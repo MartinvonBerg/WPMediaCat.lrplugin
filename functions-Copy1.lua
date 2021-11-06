@@ -308,7 +308,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = "magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
 		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -396,7 +396,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = "magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
 		end
 
 		Log('Webp-CMD: ', cmd)
