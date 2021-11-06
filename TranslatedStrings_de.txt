@@ -12,3 +12,4 @@
 "$$$/WP_MediaCat2/resync=Hole Metadaten von WordPress"
 "$$$/WP_MediaCat2/resyncHeader=Ergebnis Synchronisierung Metadaten"
 "$$$/WP_MediaCat2/resyncMsg=Protokoll"
+"$$$/WP_MediaCat2/resyncPscope=Synchronisiere Metadaten (WP->LR). Bitte warten."

@@ -4,6 +4,7 @@
 local LrApplication = import 'LrApplication'
 local LrDialogs = import 'LrDialogs'
 local LrTasks = import 'LrTasks'
+local LrProgressScope = import( 'LrProgressScope' )
 require('PluginGlobals')
 
 
@@ -13,6 +14,10 @@ require('PluginGlobals')
  
 LrTasks.startAsyncTask(function ()
     --LrMobdebug.on()
+
+    local pscope = LrProgressScope( {
+      title = LOC "$$$/WP_MediaCat2/resyncPscope=Synching MetaData (WP->LR). Please Wait!",
+    })
     
     local catalog = LrApplication.activeCatalog()
     
@@ -106,4 +111,5 @@ LrTasks.startAsyncTask(function ()
     -- prepare message as protocol
     --local msg = string.format( LOC "$$$/WP_MediaCat2/resyncMsg=Sync Protocol" .. "%q", filename)
     --LrDialogs.message( LOC "$$$/WP_MediaCat2/resyncHeader=Sync Metadata Result", msg)
+    pscope:done()
 end )

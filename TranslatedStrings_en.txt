@@ -12,3 +12,4 @@
 "$$$/WP_MediaCat2/resync=Sync with Meta from WP"
 "$$$/WP_MediaCat2/resyncHeader=Sync Metadata Result"
 "$$$/WP_MediaCat2/resyncMsg=Sync Protocol"
+"$$$/WP_MediaCat2/resyncPscope=Synching MetaData (WP->LR). Please Wait!"
