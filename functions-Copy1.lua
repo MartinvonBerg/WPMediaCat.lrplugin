@@ -306,9 +306,9 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = "magick " .. path .. " -quality 7 -define webp:auto-filter=true " .. newfile
+			cmd = "magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
 		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -394,9 +394,9 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality 7 -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = "magick " .. path .. " -quality 7 -define webp:auto-filter=true " .. newfile
+			cmd = "magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
 		end
 
 		Log('Webp-CMD: ', cmd)

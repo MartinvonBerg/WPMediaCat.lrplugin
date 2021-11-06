@@ -446,14 +446,21 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       local url = pseudoPublishSettings['siteURL']
 
       if ii ~= nil then
-        Log('set edit flag: ', remoteId)
-        local wpid = string.gsub( tostring(remoteId), 'WPSync', '')
-        url = url .. '/wp-admin/post.php?post=' .. wpid .. '&action=edit'
-        catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
-          pp:setRemoteId( wpid )
-          pp:setRemoteUrl( url)
-          pp:setEditedFlag(false)
-        end)
+        local editFlag = pp:getEditedFlag()
+        if editFlag then  
+          Log('set edit flag: ', remoteId)
+          local wpid = string.gsub( tostring(remoteId), 'WPSync', '')
+          url = url .. '/wp-admin/post.php?post=' .. wpid .. '&action=edit'
+          
+          catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
+            -- TODO: new 11 / 2021. The RemoteID was not set before. Does this work? Why did it work before with getRemoteId?
+            -- Comment out or delete if other functions using the RemoteID do not work anymore.
+            pp:setRemoteId( wpid ) 
+            pp:setRemoteUrl( url)
+            pp:setEditedFlag(false)
+          end)
+        end
+
       end
     end
   end
@@ -843,7 +850,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
   local error_msg = 'nix'
   
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
-  -- is necessary to get the LRphoto object and not the publishedphoot
+  -- is necessary to get the LRphoto object and not the publishedPhoto object.
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
   local publishedPhotos = collection:getPublishedPhotos()
   
