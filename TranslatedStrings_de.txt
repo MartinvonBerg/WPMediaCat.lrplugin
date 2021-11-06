@@ -9,3 +9,6 @@
 "$$$/WP_MediaCat2/Meta/wpurl=Link zum Bild"
 "$$$/WP_MediaCat2/Meta/gallery=Galerie" 
 "$$$/WP_MediaCat2/Meta/TagsetTitle=WordPress-Meta"
+"$$$/WP_MediaCat2/resync=Hole Metadaten von WordPress"
+"$$$/WP_MediaCat2/resyncHeader=Ergebnis Synchronisierung Metadaten"
+"$$$/WP_MediaCat2/resyncMsg=Protokoll"

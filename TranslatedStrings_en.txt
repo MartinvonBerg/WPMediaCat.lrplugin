@@ -9,3 +9,6 @@
 "$$$/WP_MediaCat2/Meta/wpurl=Image Link"
 "$$$/WP_MediaCat2/Meta/gallery=Gallery" 
 "$$$/WP_MediaCat2/Meta/TagsetTitle=WordPress-Meta"
+"$$$/WP_MediaCat2/resync=Sync with Meta from WP"
+"$$$/WP_MediaCat2/resyncHeader=Sync Metadata Result"
+"$$$/WP_MediaCat2/resyncMsg=Sync Protocol"

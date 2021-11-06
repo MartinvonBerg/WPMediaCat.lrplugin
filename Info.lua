@@ -32,6 +32,14 @@ return {
 
 	-- this script is executed at shutdown of lightroom: use it correctly otherwise it will hang. See SDK manual
 	-- LrShutdownApp = 'shutdown.lua',
+
+	LrLibraryMenuItems = {
+		{
+		  title = LOC "$$$/WP_MediaCat2/resync=Sync with Meta from WP",
+		  file = "ReSyncMetaData.lua",
+		  enabledWhen = 'photosSelected',
+		},
+	  }, 
 		
 	VERSION = { major=1, minor=4, revision=0, build=1, },
 }
