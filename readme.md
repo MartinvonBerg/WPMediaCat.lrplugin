@@ -49,7 +49,7 @@ This is a standard procedure as with any other Publishing Plugin of Lightroom.
 
 Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs.
 
-![setting2](/images/pisett2.jpg)
+![setting2](/images/pisett2.JPG)
 
 First Tab `Publish service` Choose any name you like for the description.
 
@@ -99,7 +99,7 @@ Second Tab `WordPress Login Details and Settings:`
 - Select the collection 'WPCat' (which can't be renamed or deleted)
 - Right-Click -> Select the entry First-SYNC... (second from the bottom)
 
-![firstsync](./images/firstsync.jpg)
+![firstsync](./images/firstsync.JPG)
 
 - The synchronization will be started. This may take a while ...
 Depending on the settings unknown images will be downloaded, stored and added to the LR-catalog. 
@@ -110,7 +110,7 @@ Depending on the settings unknown images will be downloaded, stored and added to
     - remove alle GIFs and other files that are NOT JPG-Files. Keep the PNGs if you like that. But: PNGs will be converted to JPGs later on, if you DID NOT decide to use wepb. If you are not sure, remove PNGs, too.
     - select from all catalog-images with identical 'WPIDs' the one image you want to use for synchronization. This might be done with the metadata panel. You have to show up the WordPress-ID in the panel an check wether there are entries with more than one for each WordPress-ID.
     - Example: The ID 5196 was set 4 times, because I have 4 files with 'unbenannt-1.jpg'. Great!
-    ![multiples](./images/multiples.jpg)
+    ![multiples](./images/multiples.JPG)
 - Finally Publish all Images again to WordPress. You can chose to do that for the Metadata only, see settings.And decide wether to write from WP to LR or vice versa. That is a bit annoying but required. You might also overwrite **ALL** existing images in WordPress! 
 - Done with first Synchronization
 
@@ -119,7 +119,7 @@ Depending on the settings unknown images will be downloaded, stored and added to
 It is possible to reload the Metadata 'title', 'caption', 'description' and 'alt_text' from WordPress and write it to Lightroom. You may do that if you changed values directly in the WordPress Media Library. This is only possible for published Photos. It's done with the following process:
 - Select one ore more photos
 - Go to the Library Menu of Lightroom and select the following entry
-![resync](./images/resync.jpg)
+![resync](./images/resync.JPG)
 - Re-Synchronisation will start and overwrite title and caption on Lightroom.
 
 
@@ -140,10 +140,10 @@ The publishing service can used like any other publish service in Lightroom. It 
 
 ## Working with Metadata
 - It is possible to select and search with the Metadata of the Plugin. Use the Metadata panel for that like shown here for the WordPress-ID.
-![multiples](./images/multiples.jpg)
+![multiples](./images/multiples.JPG)
 - You may restrict the currently shown metadata for one image to relevant data for the plugin
 
-![metaselect](./images/metaselect.jpg)
+![metaselect](./images/metaselect.JPG)
 - The small arrow right to the Image Link will guide you directly to the image in you WordPress Admin Panel (provided you are logged in).
 
 ## Generate WordPress Code for Gutenberg
