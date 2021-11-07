@@ -7,13 +7,12 @@ If you like this plugin buy me a coffee or a beer:
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CQA6XZ7LUMBJQ)
 
 
+# Installation of the Plugins
+
 **! IMPORTANT !**
 
 -     Backup WordPress completely (including Database). If you don’t know how to do: Check google for that. There are great tutorials to find for that.
 -     Backup Lightroom Catalog (*.lrcat). If you don’t know how: Check google for that. There are great tutorials to find for that.
-
-
-# Installation of the Plugins
 
 ## Required WordPress-Plugin: 
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
