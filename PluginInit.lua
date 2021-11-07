@@ -4,7 +4,7 @@ require('PluginGlobals')
 JSON=require 'JSON'
 
 ----- Debug -----------
-logDebug = true
+--logDebug = true
 --require 'strict'
 require 'Logger'
 DebugSync = false

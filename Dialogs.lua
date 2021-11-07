@@ -29,7 +29,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 	local result = {
 	
 		{
-			title = "Wordpress Login Details and Settings:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
+			title = "WordPress Login Details and Settings:", -- Bezeichnung des Abschnitts in den Exporteinstellungen
 			
 				f:group_box {
 					title = "License and Donation",
@@ -113,7 +113,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 				},
 
 				f:group_box {
-					title = "Settings for (First)-Sync with Wordpress",
+					title = "Settings for (First)-Sync with WordPress",
 					fill_horizontal = 1,
 					f:row {
 		
