@@ -209,3 +209,9 @@ Test with LR 11.0.0 under bigSUR 11.6.1.
 
 # Sponsoring
 Any welcome use the donate button for that. The development took me hundreds of hours.
+
+# Credits
+- ZeroBrane Studio for Lua Debugging, https://studio.zerobrane.com/
+- inspect.lua by Enrique García Cota, https://github.com/kikito/inspect.lua
+- Require.lua by John R. Ellis and very helpful hints from him in the Adobe Community, https://johnrellis.com/lightroom/debugging-toolkit.htm Thank you very much for you help!
+- simplecsv.lua probably from here: https://nocurve.com/2014/03/05/simple-csv-read-and-write-using-lua/
