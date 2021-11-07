@@ -1,6 +1,12 @@
 # Overview
 This Lightroom Plugin is a publishing service for WordPress. Lightroom is used as a 'headless' editor for WordPress. All image work with metadata etc. is done in Lightroom. Publish your images to WordPress in one click and update or change whatever you want. This is always done with the same WordPress image. No need to change posts or pages anymore, if you changed something for the image, e.g. title or development settings like cropping or whatever. You may even update the Image alt_text and the caption in ALL posts and pages using that image! **Feedback is welcome**
 
+# Donate
+If you like this plugin buy me a coffee or a beer:
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CQA6XZ7LUMBJQ)
+
+
 **! IMPORTANT !**
 
 -     Backup WordPress completely (including Database). If you don’t know how to do: Check google for that. There are great tutorials to find for that.
