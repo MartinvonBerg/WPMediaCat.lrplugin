@@ -45,7 +45,7 @@ webquality = '40' -- must be a string! Any value between 1 and 100 should be OK.
 ## Standard Settings the Plugin in Lightroom:
 This is a standard procedure as with any other Publishing Plugin of Lightroom. 
 
-![setting1](/images/pisett1.jpg)
+![setting1](./images/pisett1.jpg)
 
 Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs.
 
