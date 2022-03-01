@@ -10,7 +10,9 @@ This file 'Info.lua' is just allowed to return the table, nothing more, so 'requ
 ------------------------------------------------------------------------------]]
 
 --ATTENTION: changing the LrToolkitIdentifier will reset all Data for the plugin! All Data will be lost!
-PiName = 'com.mvbplugins.lightroom.export.wp_mediacat2'
+-- Private Version: The PiName is NOT correct. But I keep for compatibility reasons.
+PiName = 'com.adobe.lightroom.export.wp_mediacat2'
+-- A correct name would be: PiName = 'com.mvbplugins.lightroom.export.wp_mediacat2'
 TagsetName = 'WordPress-Meta'
 
 return {
