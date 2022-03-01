@@ -777,7 +777,6 @@ function exportServiceProvider.goToPublishedCollection( publishSettings, info )
     pscope:done()
     --LrDialogs.message ( string.format("Added %d Photos to WordPress-Media-Catalog, but %d Photos not found in Catalog! See Log-File", nfound-1, nnotfound-1),'','info')
 
-    -- TODO: Download der nicht gefundenen bilder zum Katalog
     -- TODO: am Ende process rendered photos mit context aufrufen, um die ImageID in der rendition zu setzen.
     -- Verzeichnis im PublishSettingsMenu angeben und Radio-Buttion zur Aktivierung
     -- Wenn Verzeichnis leer und aber aktiviert, dann LrPathUtils.getStandardFilePath( 'pictures' ) verwenden

@@ -35,7 +35,7 @@ return {
         PiName .. '.wpheight',
         PiName .. '.wpimgurl',
         PiName .. '.slug',
-        --PiName .. '.post',
+        PiName .. '.post',
         PiName .. '.gallery',
     }
 }

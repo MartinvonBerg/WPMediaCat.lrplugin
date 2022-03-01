@@ -293,11 +293,23 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local httphead
 	local mime = 'image/jpeg'
 	local dowebp = publishSettings['dowebp']
+	local reduceMetaData = true -- TODO: provide a setting for that
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
 	  Log('Added Media 1: ', wpid)
 	  return wpid, restData
+	end
+
+	-- reduce Metadata
+	if reduceMetaData then
+		local cmd2 = ''
+		local pipath = _PLUGIN.path .. "\\exiftool"
+		cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
+		Log('exiftool-CMD: ', cmd2 )
+		LrTasks.execute( cmd2 )
+		cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+		LrTasks.execute( cmd2 )
 	end
 	
 	if dowebp then
@@ -383,9 +395,21 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local restData = {}
 	local mime = 'image/jpeg'
 	local dowebp = publishSettings['dowebp']
+	local reduceMetaData = true
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  return
+	end
+
+	-- reduce Metadata
+	if reduceMetaData then
+		local cmd2 = ''
+		local pipath = _PLUGIN.path .. "\\exiftool"
+		cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
+		Log('exiftool-CMD: ', cmd2 )
+		LrTasks.execute( cmd2 )
+		cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+		LrTasks.execute( cmd2 )
 	end
 
 	if dowebp then
