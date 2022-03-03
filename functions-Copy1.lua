@@ -304,12 +304,28 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
+		local hasExifTool = false
 		local pipath = _PLUGIN.path .. "\\exiftool"
-		cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
-		Log('exiftool-CMD: ', cmd2 )
-		LrTasks.execute( cmd2 )
-		cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
-		LrTasks.execute( cmd2 )
+		
+		if not WIN_ENV then
+			pipath = '/usr/local/bin/exiftool' -- path according to the description on exiftool.org, but not tested
+		end
+		
+		if WIN_ENV then
+			hasExifTool = LrFileUtils.exists( pipath .. '.exe' )
+		else
+			hasExifTool = LrFileUtils.exists( pipath )
+		end
+
+		if hasExifTool then
+			cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
+			Log('exiftool-CMD: ', cmd2 )
+			LrTasks.execute( cmd2 )
+			cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+			LrTasks.execute( cmd2 )
+		else
+			Log('exiftool not found')
+		end
 	end
 	
 	if dowebp then
@@ -404,12 +420,28 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
+		local hasExifTool = false
 		local pipath = _PLUGIN.path .. "\\exiftool"
-		cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
-		Log('exiftool-CMD: ', cmd2 )
-		LrTasks.execute( cmd2 )
-		cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
-		LrTasks.execute( cmd2 )
+		
+		if not WIN_ENV then
+			pipath = '/usr/local/bin/exiftool' -- path according to the description on exiftool.org, but not tested
+		end
+
+		if WIN_ENV then
+			hasExifTool = LrFileUtils.exists( pipath .. '.exe' )
+		else
+			hasExifTool = LrFileUtils.exists( pipath )
+		end
+
+		if hasExifTool then
+			cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
+			Log('exiftool-CMD: ', cmd2 )
+			LrTasks.execute( cmd2 )
+			cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+			LrTasks.execute( cmd2 )
+		else
+			Log('exiftool not found')
+		end
 	end
 
 	if dowebp then
