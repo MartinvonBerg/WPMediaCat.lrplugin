@@ -16,7 +16,7 @@ If you like this plugin buy me a coffee or a beer:
 
 ## Required WordPress-Plugin: 
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
-        2. Search for 'wp_wpcat_json_rest' by Martin von Berg
+        2. Search for 'wp_wpcat_json_rest' by Martin von Berg.
         3. Once found, click on 'Install'
         4. Go to the plugins page and activate the plugin
 
