@@ -318,10 +318,11 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		end
 
 		if hasExifTool then
-			cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
-			Log('exiftool-CMD: ', cmd2 )
+			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
+			Log('exiftool-CMD-1: ', cmd2 )
 			LrTasks.execute( cmd2 )
-			cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
+			Log('exiftool-CMD-2: ', cmd2 )
 			LrTasks.execute( cmd2 )
 		else
 			Log('exiftool not found')
@@ -434,10 +435,11 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		end
 
 		if hasExifTool then
-			cmd2 = pipath .. " -P -all= -tagsFromFile \"" .. path .. "\" -xmp:title -xmp:subject -xmp:CreatorWorkURL=www.berg-reise-foto.de -xmp:description -iptc -icc_profile -Exif -AllDates -overwrite_original_in_place \"" .. path .. "\""
-			Log('exiftool-CMD: ', cmd2 )
+			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
+			Log('exiftool-CMD-1: ', cmd2 )
 			LrTasks.execute( cmd2 )
-			cmd2 = pipath .. " -Exif:software=0 -serialnumber=0 \"" .. path .. "\""
+			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
+			Log('exiftool-CMD-2: ', cmd2 )
 			LrTasks.execute( cmd2 )
 		else
 			Log('exiftool not found')
