@@ -194,10 +194,13 @@ ONLY recommende if you know what you are doing. You need to copy directories, re
 - Sometimes the synchronization of the catalog is too slow, so correctly published images will be marked "to publish again". Select these images and set manually to 'up to date'.
 - TODO: Translation is not finalized yet.
 
+# Version History
+2023-04-23: Update included Exiftool.exe for Windows. Update Metadata reduction with Exiftool.
+
  
 # License
 
-private use only!
+Private use only! No commercial usage allowed.
 
 # Liability
 
