@@ -195,7 +195,7 @@ ONLY recommende if you know what you are doing. You need to copy directories, re
 - TODO: Translation is not finalized yet.
 
 # Version History
-2023-04-23: Update included Exiftool.exe for Windows. Update Metadata reduction with Exiftool.
+2023-04-23: Update included Exiftool.exe for Windows. Update Metadata reduction with Exiftool..
 
  
 # License
