@@ -319,10 +319,10 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 
 		if hasExifTool then
 			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
-			Log('exiftool-CMD: ', cmd2 )
+			Log('exiftool-CMD-1: ', cmd2 )
 			LrTasks.execute( cmd2 )
 			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
-			Log('exiftool-CMD: ', cmd2 )
+			Log('exiftool-CMD-2: ', cmd2 )
 			LrTasks.execute( cmd2 )
 		else
 			Log('exiftool not found')
