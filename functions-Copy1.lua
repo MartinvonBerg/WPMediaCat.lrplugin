@@ -430,6 +430,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		restData = ExtractDataFromREST(result)
   
 	elseif headers.status == 200 and wpid ~= nil then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
+		result = JSON:decode(result)
 		wpid = tonumber(result['id'])
 		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
 		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
