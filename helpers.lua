@@ -300,3 +300,7 @@ function urlencode(url)
     return url
 
 end
+
+function tableHasKey(table,key)
+    return table[key] ~= nil
+end

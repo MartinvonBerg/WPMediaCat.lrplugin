@@ -18,7 +18,7 @@ If you like this plugin buy me a coffee or a beer:
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
         2. Search for 'wp_wpcat_json_rest' by Martin von Berg.
         3. Once found, click on 'Install'
-        4. Go to the plugins page and activate the plugin
+        4. Go to the plugins page and activate the plugin. No settings required.
 
 ## Required Lightroom-Plugin:
         See Lightroom Documentation or google how to install a plugin. Shortform:
@@ -36,21 +36,14 @@ logDebug = true -- or false
 - Store the file `PluginGlobals.lua`
 
 # Plugin Settings
-## Manual changes in Files
-No need to change anything. If you like to change the Quality of the (optional) Webp-Conversion, you can do that:
- - Open the File `PluginGlobals.lua` and change the following line
-```lua
-webquality = '40' -- must be a string! Any value between 1 and 100 should be OK.
-```
-- Mind that with a quality higher than 40 the webp-files will get rather big.
-- Store this file `PluginGlobals.lua`
+
 
 ## Standard Settings the Plugin in Lightroom:
 This is a standard procedure as with any other Publishing Plugin of Lightroom. 
 
 ![setting1](/images/pisett1.JPG)
 
-Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs.
+Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs. (The snapshot is not up to date)
 
 ![setting2](/images/pisett2.JPG)
 
@@ -74,8 +67,9 @@ Second Tab `WordPress Login Details and Settings:`
 
     - Test the Login with the Button `Test Login`. If the test is not successful (e.g. wrong Login Name or Password) it will not be possible to safe these settings. Additionally the installation of the WP-Plugin will be tested. The test gives you some hints. **BUT** that means that this Button has to be pressed every time you wish to change anything. 
     
-    - Optional: Settings for File Upload (Webp-Conversion)
+    - Optional: Settings for File Upload (AVIF- and Webp-Conversion)
         - Check if you wish to convert the files from jpg to webp prior to upload. This is only available if ImageMagick is installed on your machine. Check webpage of ImageMagick for the installation procedure on macOS or Windows.
+        - Check if you wish to reduce metadata with Exiftool, which has to be available in the install path.
         - **macOS** Copy the binary `magick`into the folder where you copied this Lightroom plugin.  
 
     - Settings for (First)-Sync with WordPress
@@ -154,11 +148,12 @@ The publishing service can used like any other publish service in Lightroom. It 
 - The correct Gutenberg Code for wp-image is copied to your clipboard.
 - Just paste this code to your page / post and you are done with adding an image!
 - There is some overhead which you unfortunately have to delete.
+- Mind: this hasn't been updated for quite a while.
 
  
 # Updating of Plugins
 
-No need to update at the moment
+Update if you want AVIF and the conversion settings.
  
 
 # De-Installation of the Plugins
@@ -212,6 +207,11 @@ Test with LR 11.0.0 under bigSUR 11.6.1.
 
 # Sponsoring
 Any welcome use the donate button for that. The development took me hundreds of hours.
+
+# Changelog
+- 1.5.0.0 / 20.10.2024:
+    
+    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems.
 
 # Credits
 - ZeroBrane Studio for Lua Debugging, https://studio.zerobrane.com/

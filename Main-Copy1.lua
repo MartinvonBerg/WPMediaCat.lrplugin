@@ -71,7 +71,10 @@ exportServiceProvider.exportPresetFields = {
   { key = 'preCopy', default = 'Copy-'},
   { key = 'firstSyncDoMetaOnly', default = true},
   { key = 'LrMeta_to_WP', default = false},
-  { key = 'dowebp', default = false},
+  { key = 'doConversion', default = false},
+  { key = 'fileFormat', default = 'WEBP'},
+  { key = 'conversionQuality', default = 80},
+  { key = 'reduceMetaData', default = false},
   { key = 'doCaption', default = false},
   { key = 'webpStatus', default = 'not tested yet'},
 }
@@ -123,7 +126,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local renderedPhoto = {}
   local notuploaded = {}
   local countnotuploaded = 0
-  local dowebp = exportSettings.dowebp -- Achtung: Das wird mehrfach gesetzt
+  local doConversion = exportSettings.doConversion
 
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -289,7 +292,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
               
-              if dowebp then
+              if doConversion then
                 UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, wpid )
               end
               
@@ -387,7 +390,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             -- fehlende LR-Metadaten in den WP Katalog schreiben
             WritephotoMetaToWp( pseudoPublishSettings, result, photoMeta )
             -- mit UpdateKeys die Metadaten für webp-Bilder ergänzen
-            if dowebp then
+            if doConversion then
                UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, result )
             end
             -- Custom-Metadaten in WP-Katalog schreiben: Rest-Antwort-Daten in CustomMeta schreiben

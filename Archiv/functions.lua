@@ -298,7 +298,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	result = JSON:decode(result)
   
 	-- Extract data from the Response to the Create-Request
-	  if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
+	if headers.status == 201 then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
 		wpid = tonumber(result['id'])
 		restData = ExtractDataFromREST(result)
   
@@ -387,9 +387,9 @@ function GetMedia( publishSettings, perpage, page )
 	local result, headers = LrHttp.get( url, httphead )
   
 	if headers.status == 200 then
-      result = JSON:decode(result)
-  else 
-    result = nil
+      	result = JSON:decode(result)
+  	else 
+    	result = nil
 	end
 	
 	return result

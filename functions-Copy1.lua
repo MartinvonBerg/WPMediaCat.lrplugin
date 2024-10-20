@@ -46,7 +46,20 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	  Log('siteURL ', publishSettings['siteURL'])
 	  return success
 	end
-  
+
+	-- check reachability of WP-site and Plugin
+	local result = CheckLogin( publishSettings )
+	if tableHasKey( result, 'error' ) then
+		Log('WritephotoMetaToWp: ', result['error'])
+		wpid = result['error']
+		return wpid, restData
+	end
+	if not publishSettings.wpplugin then
+		Log('WritephotoMetaToWp: WP-Plugin not available')
+		wpid = 'WP-Plugin not available'
+		return wpid, restData
+	end
+	
 	local n = 0
 	local hash = 'Basic ' .. publishSettings['hash']
 	local httphead = {
@@ -292,13 +305,28 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local url = ''
 	local httphead
 	local mime = 'image/jpeg'
-	local dowebp = publishSettings['dowebp']
-	local reduceMetaData = true -- TODO: provide a setting for that
+	local doConversion = publishSettings['doConversion']
+	local conversionQuality = publishSettings['conversionQuality']
+	local fileFormat = publishSettings['fileFormat']
+	local reduceMetaData = publishSettings['reduceMetaData']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
 	  Log('Added Media 1: ', wpid)
 	  return wpid, restData
+	end
+	
+	-- check reachability of WP-site and Plugin
+	local result = CheckLogin( publishSettings )
+	if tableHasKey( result, 'error' ) then
+		Log('AddNewMedia: ', result['error'])
+		wpid = result['error']
+		return wpid, restData
+	end
+	if not publishSettings.wpplugin then
+		Log('AddNewMedia: WP-Plugin not available')
+		wpid = 'WP-Plugin not available'
+		return wpid, restData
 	end
 
 	-- reduce Metadata
@@ -318,7 +346,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		end
 
 		if hasExifTool then
-			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
+			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
 			Log('exiftool-CMD-1: ', cmd2 )
 			LrTasks.execute( cmd2 )
 			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
@@ -329,15 +357,15 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		end
 	end
 	
-	if dowebp then
+	if doConversion and fileFormat == 'WEBP' then
 		mime = 'image/webp'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -346,6 +374,25 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		Log('Webp-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
+	elseif doConversion and fileFormat == 'AVIF' then
+		mime = 'image/avif'
+		local cmd = ''
+		local newfile = string.gsub( path, 'jpg', 'avif')
+		-- convert jpg file to avif with imagick. Must be installed
+		if WIN_ENV then
+			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+		else
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
+		end
+
+		Log('Avif-CMD: ', cmd)
+		LrTasks.execute( cmd ) 
+		Log('Avif-Path: ', newfile)	
+		filen = string.gsub( filen, 'jpg', 'avif' )
+		Log('Avif-file:', filen)
+		LrTasks.sleep(0.1)
+		path = newfile
+
 	end 
 
 	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
@@ -375,19 +422,15 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
   
 	-- Create the image in Wordpress via REST-API according to the above settings
 	local result, headers = LrHttp.post( url, imgfile, httphead )
-	result = JSON:decode(result)
-	wpid = tonumber(result['id'])
-	Log('AddNewMedia url: ' .. url .. ' filen ' .. filen)
-	Log('http: ' .. inspect(headers.status) .. ' ID ' .. inspect(wpid))
-	Log('result: ' .. inspect(result))
-  
+	
 	-- Extract data from the Response to the Create-Request
 	if headers.status == 201 and wpid ~= nil then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
-		--wpid = tonumber(result['id'])
+		result = JSON:decode(result)
+		wpid = tonumber(result['id'])
 		restData = ExtractDataFromREST(result)
   
 	elseif headers.status == 200 and wpid ~= nil then -- Antwort auf wp-plugin wpcat_json_rest mit "/wp-json/extmedialib/v1/addtofolder/"
-		--wpid = tonumber(result['id'])
+		wpid = tonumber(result['id'])
 		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
 		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
 		local httphead = {
@@ -398,10 +441,14 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		restData = ExtractDataFromREST(result)
   
 	else
-		wpid = 'Upload: Fault during upload to WP: ' .. filen .. '.\nHeader-Status: ' .. tostring(headers.status) .. '\nMessage: ' .. result['message']
+		wpid = 'Upload: Fault during upload to WP: ' .. filen .. '.\nHeader-Status: ' .. tostring(headers.status) .. '\nMessage: ' .. inspect(result)
 	end
-  
+
+	Log('AddNewMedia url: ' .. url .. ' filen ' .. filen)
+	Log('http: ' .. inspect(headers.status) .. ' ID ' .. inspect(wpid))
+	Log('result: ' .. inspect(result))
 	Log('Added Media 3: ', inspect(wpid) )
+
 	return wpid, restData
 end
   
@@ -411,13 +458,28 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local filen = filename
 	local restData = {}
 	local mime = 'image/jpeg'
-	local dowebp = publishSettings['dowebp']
-	local reduceMetaData = true
+	local doConversion = publishSettings['doConversion']
+	local conversionQuality = publishSettings['conversionQuality']
+	local fileFormat = publishSettings['fileFormat']
+	local reduceMetaData = publishSettings['reduceMetaData']
   
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  return
 	end
-
+	
+	-- check reachability of WP-site and Plugin
+	local result = CheckLogin( publishSettings )
+	if tableHasKey( result, 'error' ) then
+		Log('UpdateMedia: ', result['error'])
+		wpid = result['error']
+		return wpid, restData
+	end
+	if not publishSettings.wpplugin then
+		Log('UpdateMedia: WP-Plugin not available')
+		wpid = 'WP-Plugin not available'
+		return wpid, restData
+	end
+	
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
@@ -435,7 +497,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		end
 
 		if hasExifTool then
-			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
+			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
 			Log('exiftool-CMD-1: ', cmd2 )
 			LrTasks.execute( cmd2 )
 			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
@@ -446,15 +508,15 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		end
 	end
 
-	if dowebp then
+	if doConversion and fileFormat == 'WEBP' then
 		mime = 'image/webp'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. webquality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. webquality .. " -define webp:auto-filter=true " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 		end
 
 		Log('Webp-CMD: ', cmd)
@@ -464,6 +526,26 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		Log('Webp-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
+
+	elseif doConversion and fileFormat == 'AVIF' then
+		mime = 'image/avif'
+		local cmd = ''
+		local newfile = string.gsub( path, 'jpg', 'avif')
+		-- convert jpg file to avif with imagick. Must be installed
+		if WIN_ENV then
+			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+		else
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
+		end
+
+		Log('Avif-CMD: ', cmd)
+		LrTasks.execute( cmd ) 
+		Log('Avif-Path: ', newfile)	
+		filen = string.gsub( filen, 'jpg', 'avif' )
+		Log('Avif-file:', filen)
+		LrTasks.sleep(0.1)
+		path = newfile
+
 	end 
   
 	local httphead = {
@@ -522,9 +604,9 @@ function GetMedia( publishSettings, perpage, page )
 	local result, headers = LrHttp.get( url, httphead )
   
 	if headers.status == 200 then
-      result = JSON:decode(result)
-  else 
-    result = nil
+      	result = JSON:decode(result)
+  	else 
+    	result = nil
 	end
 	
 	return result
@@ -537,22 +619,35 @@ function DeleteMedia( publishSettings, wpmediaid )
 	if publishSettings == {} or publishSettings.hash == '' or publishSettings.siteURL == '' or idcheck ~= 'number' then
 	  return result
 	end
-  
+	
+	-- check reachability of WP-site and Plugin
+	local result = CheckLogin( publishSettings )
+	if tableHasKey( result, 'error' ) then
+		Log('DeleteMedia: ', result['error'])
+		wpid = result['error']
+		return wpid, restData
+	end
+	if not publishSettings.wpplugin then
+		Log('DeleteMedia: WP-Plugin not available')
+		wpid = 'WP-Plugin not available'
+		return wpid, restData
+	end
+	
 	local hash = 'Basic ' .. publishSettings.hash
 	  local httphead = {
 		{field='Authorization', value=hash},
 	  }
 	local url = ''  
 	
-	  url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
+	url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
 	--http://127.0.0.1/wordpress/wp-json/wp/v2/media/3439?force=1
 	--http-method: delete   
-	  local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
+	local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
   
-	  if headers.status == 200 then
+	if headers.status == 200 then
 		result = JSON:decode(result)
 		result = result['deleted']
-	elseif headers.status == 404 then -- also successful, id is not available
+	elseif headers.status == 404 then -- also successful, ID is not available
 		result = JSON:decode(result)
 		result = result['code']
 	end
@@ -731,7 +826,20 @@ function UpdateKeys( publishSettings, photometa, wpid )
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' then
 	  return
 	end
-  
+	
+	-- check reachability of WP-site and Plugin
+	local result = CheckLogin( publishSettings )
+	if tableHasKey( result, 'error' ) then
+		Log('UpdateKeys: ', result['error'])
+		wpid = result['error']
+		return wpid, restData
+	end
+	if not publishSettings.wpplugin then
+		Log('UpdateKeys: WP-Plugin not available')
+		wpid = 'WP-Plugin not available'
+		return wpid, restData
+	end
+	
 	local httphead = {
 		{field='Authorization', value=hash},
 		{field='Content-Type', value='application/json'},

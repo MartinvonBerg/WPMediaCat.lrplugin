@@ -54,7 +54,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 				f:group_box {
 					title = "Login Settings",
-					
+					fill_horizontal = 1,
 					EntryBox( f, 'Site URL', 'siteURL'),			-- must start with http:// or https://
 					EntryBox( f, 'Login Name', 'loginName'),	
 					EntryBox( f, 'Login Password', 'loginPassword'),
@@ -97,19 +97,62 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 				f:group_box {
 					title = "Settings for File Upload",
 					fill_horizontal = 1,
+
 					f:row {
-		
-						f:checkbox {
-							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Convert Files to WEBP",
-							value = bind 'dowebp',
-						},
-		
 						f:static_text {
 							title = bind( 'webpStatus' ),
 							fill_horizontal = 0,
 							width_in_chars = 40,
 						},
 					},
+
+					f:row {
+		
+						f:checkbox {
+							title = LOC "$$$/FtpUpload/ExportDialog/doLocalCopy=Convert Files to : ",
+							value = bind 'doConversion',
+						},
+
+						f:popup_menu {
+							value = bind 'fileFormat',  -- Bindet den Wert an die Einstellung
+							items = {
+								{ value = 'WEBP', title = 'WEBP' },
+								{ value = 'AVIF', title = 'AVIF' },
+							},
+						},
+
+						f:static_text {
+							title = "Quality"
+						},
+						
+						f:slider {
+							value = bind("conversionQuality"),
+							min = 0,
+							max = 100,
+							increment = 1,
+							width_in_chars = 20
+						},
+						f:edit_field {
+							value = bind {
+								key = "conversionQuality",
+								transform = function(value) return math.floor(value + 0.5) end -- Ganzzahl anzeigen
+							 },
+							enabled = true,
+							truncation = 'middle',
+							immediate = true,
+							width_in_chars = 4,
+							alignment = "right" -- Rechtsbündig anzeigen
+						},
+
+					},
+
+					f:row {
+						f:checkbox {
+							title = LOC "Reduce MetaData",
+							value = bind 'reduceMetaData',
+						},
+					},
+					
 				},
 
 				f:group_box {
@@ -335,7 +378,10 @@ function dialogs.startDialog( propertyTable )
 	
 	propertyTable:addObserver( 'siteURL', checkURL )
 	
-	propertyTable:addObserver( 'dowebp', checkWebpConversion )
+	propertyTable:addObserver( 'doConversion', checkFileConversion )
+	propertyTable:addObserver( 'conversionQuality', checkFileConversion )
+	propertyTable:addObserver( 'fileFormat', checkFileConversion )
+	propertyTable:addObserver( 'reduceMetaData', checkFileConversion )
 
 	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
 	propertyTable:addObserver( 'localPath', updateExportStatus )
@@ -376,29 +422,49 @@ function checkURL( propertyTable )
 	propertyTable.msgBox = str
 end
 
-function checkWebpConversion( propertyTable )
+function checkFileConversion( propertyTable )
 	-- body
-	Log( "checkWebpConversion: " .. propertyTable.webpStatus) -- Debugging
+	Log( "checkFileConversion: " .. propertyTable.webpStatus) -- Debugging
 	
-	if propertyTable.dowebp then
+	if propertyTable.doConversion then
 		--propertyTable.webpStatus = 'Activated. Tested!'
 		local p2 = LrPathUtils.getStandardFilePath( 'documents' )
 		
 		local filepath = p2 .. DIRSEP .. 'LRTestImagick.txt'
+		local value
                 
 		if not LrFileUtils.exists( filepath ) then
-			propertyTable.webpStatus = 'ImageMagick not installed. Webp conversion not possible!'
-			propertyTable.dowebp = false
+			propertyTable.webpStatus = 'ImageMagick is not installed. Webp conversion not possible!'
+			propertyTable.doConversion = false
+			propertyTable.fileFormat = 'none'
+			propertyTable.conversionQuality = 0
 		else
 			local attr = LrFileUtils.fileAttributes( filepath )
 			local size = attr['fileSize']
 			Log('Test filesize: ', size)
+
 			if size > 50 then
-				propertyTable.webpStatus = 'ImageMagick installed!'
+				propertyTable.webpStatus = 'ImageMagick is installed!'
+				
+				value = math.floor(propertyTable.conversionQuality + 0.5)
+				if value > 100 then
+					value = 100	
+				end
+				propertyTable.conversionQuality = value
+
+				if propertyTable.fileFormat == 'none' then
+					propertyTable.webpStatus = 'ImageMagick is installed! Select File Format!'
+				end
+				
+				if propertyTable.conversionQuality == 0 then
+					propertyTable.webpStatus = propertyTable.webpStatus .. ' Set Conversion Quality!'
+				end
+				Log('conversion settings: ', propertyTable.conversionQuality, propertyTable.fileFormat)
 			else
 				propertyTable.webpStatus = 'ImageMagick not executable. Webp conversion not possible!'
-				propertyTable.dowebp = false
+				propertyTable.doConversion = false
 			end
+			
 		end
 	
 	else
@@ -407,7 +473,7 @@ function checkWebpConversion( propertyTable )
 
 	--if MAC_ENV then
 	--	propertyTable.webpStatus = 'Not for macOS! Webp conversion not possible!'
-	--	propertyTableq.dowebp = false 
+	--	propertyTableq.doConversion = false 
 	--end
 end
 

@@ -64,6 +64,9 @@ function CheckLogin( publishSettings )
 			publishSettings.hash = encb64(uid .. ':' .. pwd)
 			result = JSON:decode(result)  -- Debugging
 			Log(result)  -- Debugging
+		elseif headers.status == 401 then
+			result = JSON:decode(result)
+			ReturnTable['error'] = result.message
 		else
       		ReturnTable['error'] = 'Site reachable, but unknown error.'
 		end
