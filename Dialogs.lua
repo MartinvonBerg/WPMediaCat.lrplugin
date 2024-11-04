@@ -148,6 +148,13 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 					f:row {
 						f:checkbox {
+							title = LOC "Generate Subsizes locally (faster)",
+							value = bind 'generateSubsizes',
+						},
+					},
+
+					f:row {
+						f:checkbox {
 							title = LOC "Reduce MetaData",
 							value = bind 'reduceMetaData',
 						},
@@ -382,6 +389,7 @@ function dialogs.startDialog( propertyTable )
 	propertyTable:addObserver( 'conversionQuality', checkFileConversion )
 	propertyTable:addObserver( 'fileFormat', checkFileConversion )
 	propertyTable:addObserver( 'reduceMetaData', checkFileConversion )
+	propertyTable:addObserver( 'generateSubsizes', checkFileConversion )
 
 	propertyTable:addObserver( 'doLocalCopy', updateExportStatus )
 	propertyTable:addObserver( 'localPath', updateExportStatus )

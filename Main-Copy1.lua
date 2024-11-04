@@ -75,6 +75,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'fileFormat', default = 'WEBP'},
   { key = 'conversionQuality', default = 80},
   { key = 'reduceMetaData', default = false},
+  { key = 'generateSubsizes', default = false},
   { key = 'doCaption', default = false},
   { key = 'webpStatus', default = 'not tested yet'},
 }
@@ -127,6 +128,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local notuploaded = {}
   local countnotuploaded = 0
   local doConversion = exportSettings.doConversion
+  local generateSubsizes = exportSettings.generateSubsizes
 
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -290,7 +292,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             else
               -- update photo including keywords. This is always the case for webp-images
               result = 'none'
-              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder, wpid )
               
               if doConversion then
                 UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, wpid )
@@ -327,7 +329,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
             else
               -- update photo including keywords
               result = 'none'
-              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, wpid )
+              result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder, wpid )
               -- write WP-dimensions of image to Custom-Metadata. 
               catalog:withWriteAccessDo( 'UpdateDimension', function ()
                 photo:setPropertyForPlugin( _PLUGIN,'wpwidth', tostring(dimensions['width']) )

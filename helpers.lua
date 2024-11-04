@@ -304,3 +304,25 @@ end
 function tableHasKey(table,key)
     return table[key] ~= nil
 end
+
+function round(value)
+    if value % 1 < 0.5 then
+        return math.floor(value)
+    else
+        return math.floor(value) + 1
+    end
+end
+
+function isJSON(str)
+    --local status = pcall(function() LrJson.decode(str) end)
+    local status = pcall(function() json.decode(str) end)
+    return status
+end
+
+function getWPStandardMediaFolder()
+    local currentTime = LrDate.currentTime()
+    local year = LrDate.timeToUserFormat( currentTime, "%Y", false )
+    local month = LrDate.timeToUserFormat( currentTime, "%m", false )
+    return year .. "/" .. month
+end
+
