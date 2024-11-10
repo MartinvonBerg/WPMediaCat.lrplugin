@@ -211,7 +211,7 @@ Any welcome use the donate button for that. The development took me hundreds of 
 # Changelog
 - 1.5.0.0 / 20.10.2024:
     
-    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems.
+    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additonally local generation of WEBP and AVIF-Files with ImageMagick.
 
 # Credits
 - ZeroBrane Studio for Lua Debugging, https://studio.zerobrane.com/
