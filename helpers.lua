@@ -319,10 +319,3 @@ function isJSON(str)
     return status
 end
 
-function getWPStandardMediaFolder()
-    local currentTime = LrDate.currentTime()
-    local year = LrDate.timeToUserFormat( currentTime, "%Y", false )
-    local month = LrDate.timeToUserFormat( currentTime, "%m", false )
-    return year .. "/" .. month
-end
-

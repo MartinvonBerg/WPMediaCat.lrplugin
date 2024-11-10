@@ -148,7 +148,7 @@ function dialogs.sectionsForTopOfDialog( f, propertyTable )
 
 					f:row {
 						f:checkbox {
-							title = LOC "Generate Subsizes locally (faster)",
+							title = LOC "Generate Subsizes locally (faster). Does not work for WPCat the WP Standard Folder like 2024/11.",
 							value = bind 'generateSubsizes',
 						},
 					},

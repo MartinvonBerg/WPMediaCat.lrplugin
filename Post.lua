@@ -18,7 +18,7 @@ local LrHttp = import( 'LrHttp' )
 function CheckLogin( publishSettings ) 
     --LrMobdebug.on()
 	publishSettings.urlreadable = false
-	Log('Debug: ' .. tostring(logDebug))
+	--Log('Debug: ' .. tostring(logDebug))
 	
 	local ReturnTable = {} 
 	 
@@ -31,8 +31,8 @@ function CheckLogin( publishSettings )
       }
   
 	local url = publishSettings.siteURL .. "/wp-json/wp/v2/"
-	Log('url: ' .. url)  -- Debugging
-	Log('hash-value: ' .. hash) -- Debugging
+	Log('CheckLogin url: ' .. url)  -- Debugging
+	Log('CheckLogin hash-value: ' .. hash) -- Debugging
 
 	--local result, headers = LrHttp.get( url ) -- GET-Anfrage ohne Auth
 	local result, headers = LrHttp.post( url, '', {}, 'HEAD',2 ) -- GET-Anfrage ohne Auth
@@ -110,6 +110,6 @@ function CheckLogin( publishSettings )
 		end
 
 	end
-  
-  return ReturnTable, nil
+	Log('CheckLogin: End')
+  	return ReturnTable, nil
 end

@@ -86,7 +86,7 @@ exportServiceProvider.disableRenamePublishedCollectionSet = true -- benennt den 
 ------------ exportServiceProvider ----------------------------
 
 -- this function is only called AFTER publishing AND if custum sort order is selected AND if supportsCustomSortOrder = true
--- So, after the custum sorting at least one photo has to be re-published to have this sort order written to WP.
+-- So, after the custom sorting at least one photo has to be re-published to have this sort order written to WP.
 -- wird auch nach dem Löschen aufgerufen!
 function exportServiceProvider.imposeSortOrderOnPublishedCollection( publishSettings, info, remoteIdSequence )
    Log('impose Sort aufgerufen')
@@ -290,7 +290,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               result = 'none'
               result, data = UpdateKeys( pseudoPublishSettings, photoMeta, wpid )
             else
-              -- update photo including keywords. This is always the case for webp-images
+              -- update photo including keywords. This is always the case for avif and webp-images
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder, wpid )
               

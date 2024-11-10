@@ -5,6 +5,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
+local LrPhotoInfo = import 'LrPhotoInfo'
 --JSON=require 'JSON'
 
 
@@ -309,10 +310,13 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local conversionQuality = publishSettings['conversionQuality']
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
+	local generateSubsizes = publishSettings['generateSubsizes']
   
+	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
 	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
 	  Log('Added Media 1: ', wpid)
+	  Log('path: ', path, 'filename: ', filename, 'hash: ', publishSettings['hash'], 'siteURL: ', publishSettings['siteURL'], 'hash: ',hash)
 	  return wpid, restData
 	end
 	
@@ -328,6 +332,12 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		wpid = 'WP-Plugin not available'
 		return wpid, restData
 	end
+
+	-- get the dimensions of the original image
+	local dimensions = LrPhotoInfo.fileAttributes( path )
+	local w = dimensions.width
+	local h = dimensions.height
+	Log('WP-Dimensions: ', w, h)
 
 	-- reduce Metadata
 	if reduceMetaData then
@@ -357,6 +367,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		end
 	end
 	
+	-- create the new file if webp or avif if set
 	if doConversion and fileFormat == 'WEBP' then
 		mime = 'image/webp'
 		local cmd = ''
@@ -365,7 +376,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
 		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -382,7 +393,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
+			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
 		end
 
 		Log('Avif-CMD: ', cmd)
@@ -395,33 +406,41 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 
 	end 
 
-	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
-	Log('Mime-type: ', mime)
-  
-	-- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
-	if defaultcoll then  
-	  url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/"
-	  httphead = {
-		{field='Authorization', value=hash},
-		{field='Content-Disposition', value='form-data; filename="' .. filen .. '"'},
-		{field='Content-Type', value=mime}, -- value für webp anpassen
-	  }
-	elseif folder ~= '' then
-	  --Header-Wert: Content-Disposition = attachment; filename=example.jpg OHNE Anführungszeichen!
-	  url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/addtofolder/" .. folder
-	  httphead = {
-		{field='Authorization', value=hash},
-		{field='Content-Disposition', value='attachment; filename=' .. filen},
-		{field='Content-Type', value=mime}, -- value für webp anpassen
-	  }
-	else
-	  wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
-	  Log('Added Media 2: ', wpid)
-	  return wpid, restData
+	-- generate and upload sub-sizes if set. For all file types
+	if generateSubsizes and not defaultcoll then
+		-- generate the filenames
+		sizes = getImageSubsizes(publishSettings, hash)
+		Log('WP-Subsizes: ', sizes)
+
+		files = generateFileNames(w,h, filen,sizes)
+		Log('WP-Files: ', files)
+		
+		-- generate the sub-sizes in a loop and upload them to wordpress
+		for key, name in pairs(sizes) do
+			local newfilen = sizes[key].file
+			local baseName = newfilen:match("^(.*)%.")
+			local newpath = string.gsub(path, "([^\\]+)%.([^%.]+)$", baseName .. ".%2")
+			Log('newpath: ', newpath)
+
+			-- resize the image
+			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime)
+
+			-- upload the image CASE 1: new file, subsize, special folder
+			uploadMedia(newpath,           -- path to the file
+						newfilen,          -- filename
+						publishSettings,   -- table with settings including siteURL
+						hash,              -- authorization hash
+						mime,              -- mime type of the file
+						defaultcoll,       -- boolean for default collection
+						folder,            -- folder path or empty string
+						'filetofolder',     -- route
+						0                 -- The WP ID of the media 
+				)
+		end
 	end
-  
-	-- Create the image in Wordpress via REST-API according to the above settings
-	local result, headers = LrHttp.post( url, imgfile, httphead )
+
+	-- upload the image CASE 2: new image to wordpress, original, WPCat and CASE 3: new image to wordpress, original, special folder
+	local result, headers = uploadMedia(path, filen, publishSettings, hash, mime, defaultcoll, folder, 'addtofolder', 0)
 	
 	-- Extract data from the Response to the Create-Request
 	if headers.status == 201 and wpid ~= nil then -- Antwort aus REST bei default-collection mit "/wp-json/wp/v2/media/"
@@ -454,7 +473,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 end
   
 -- Update Media File to WP-Media-Catalog via REST-API
-function UpdateMedia( publishSettings, filename, path, wpid ) 
+function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid ) 
 	local hash = 'Basic ' .. publishSettings['hash']
 	local filen = filename
 	local restData = {}
@@ -463,9 +482,13 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 	local conversionQuality = publishSettings['conversionQuality']
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
-  
+	local generateSubsizes = publishSettings['generateSubsizes']
+	
+	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
-	  return
+		wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+		Log('Update Media 1: ', wpid)
+		return wpid, restData
 	end
 	
 	-- check reachability of WP-site and Plugin
@@ -480,6 +503,12 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		wpid = 'WP-Plugin not available'
 		return wpid, restData
 	end
+
+	-- get the dimensions of the original image
+	local dimensions = LrPhotoInfo.fileAttributes( path )
+	local w = dimensions.width
+	local h = dimensions.height
+	Log('WP-Dimensions: ', w, h)
 	
 	-- reduce Metadata
 	if reduceMetaData then
@@ -509,6 +538,7 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		end
 	end
 
+		-- create the new file if webp or avif if set
 	if doConversion and fileFormat == 'WEBP' then
 		mime = 'image/webp'
 		local cmd = ''
@@ -547,26 +577,68 @@ function UpdateMedia( publishSettings, filename, path, wpid )
 		LrTasks.sleep(0.1)
 		path = newfile
 
-	end 
-  
-	local httphead = {
-		{field='Authorization', value=hash},
-		{field='Content-Disposition', value='form-data; filename=' .. filen },
-		{field='Content-Type', value=mime},
-	}
-  
-	local imgfile = LrFileUtils.readFile(path) -- Rückgabe als String!
-	-- changemime is added always, just in case. It does not disturb if not required.  
-	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid) .. "?changemime=true"
-	  
-	local result, headers = LrHttp.post( url, imgfile, httphead )
-	Log('UpdateMedia http-status: ', headers.status)
+	end
+
+	-- get the upload folder for the default collection - currently unpublished
+	--[[
+	if defaultcoll then
+		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
+		Log("Anfrage des zu aktualisierenden Bildes über Standard-REST: ", url)
+		local httphead = {
+		  {field='Authorization', value=hash}        
+		}
+		local result, headers = LrHttp.get( url, httphead )
+		local result = JSON:decode(result)
+		local restData = ExtractDataFromREST(result)
+		local guid = restData.origurl
+		local filename = restData.origfile
+		local year, month = guid:match("http%S+/(%d%d%d%d)/(%d%d)/[%w_%-%.]+%.[%w]+")
+		folder = year .. "/" .. month
+		Log('File: ', filename, ' in Folder: ', folder)
+	end
+	--]]
+
+	-- generate and upload sub-sizes if set. For all file types
+	if generateSubsizes and not defaultcoll then
+		-- generate the filenames
+		sizes = getImageSubsizes(publishSettings, hash)
+		Log('WP-Subsizes: ', sizes)
+
+		files = generateFileNames(w,h, filen,sizes)
+		Log('WP-Files: ', files)
+		
+		-- generate the sub-sizes in a loop and upload them to wordpress
+		for key, name in pairs(sizes) do
+			local newfilen = sizes[key].file
+			local baseName = newfilen:match("^(.*)%.")
+			local newpath = string.gsub(path, "([^\\]+)%.([^%.]+)$", baseName .. ".%2")
+			Log('newpath: ', newpath)
+
+			-- resize the image
+			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime)
+
+			-- upload the image CASE 4: update file, subsize, special folder
+			uploadMedia(newpath,           -- path to the file in local file system
+						newfilen,          -- filename
+						publishSettings,   -- table with settings including siteURL
+						hash,              -- authorization hash
+						mime,              -- mime type of the file
+						defaultcoll,       -- boolean for default collection
+						folder,            -- folder path or empty string
+						'updatefile',      -- route
+						wpid                  -- The WP ID of the file to update
+				)
+		end
+	end
+	
+	-- upload the updated and unscaled image which was generated by Lightroom
+	-- CASE 5: update image in WordPress, original, special folder and WPCat
+	local result, headers = uploadMedia(path, filen, publishSettings, hash, mime, defaultcoll, folder, 'updatemedia', wpid)
+
 	if headers.status == 200 then
 		result = JSON:decode(result)
-		--wpid = tonumber(result['id'])
-		--restData = ExtractDataFromREST(result)
 	else
-		  wpid = 'Update Media Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+		wpid = 'Update Media Fault: ' .. tostring(headers.status .. ' : ' .. filen)
 	end
 	
 	return wpid, result
@@ -882,6 +954,7 @@ function ResetCustomMeta (photo)
   end )
 end
 
+-- get Metadata from photo and return as json table
 function getWebpMetaData ( photo )
 
 	local aspect = photo:getRawMetadata( 'aspectRatio' )
@@ -918,4 +991,193 @@ function getWebpMetaData ( photo )
 	}
 	
 	return WebpPhotoMeta
+end
+
+-- Functions for local generation of image subsizes
+function getImageSubsizes(publishSettings, hash)
+	local url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/imagesubsizes"
+	local httphead = {
+			{field='Authorization', value=hash},
+		}
+    -- Make the HTTP GET request to the WordPress REST API
+	local result, headers = LrHttp.get( url, httphead )
+    
+    -- Parse the JSON response
+    local response = JSON:decode(result)
+    
+    -- Initialize array to store the sizes
+    local sizesArray = {}
+    
+    -- Check if we have a valid response with sizes
+    if response and response.sizes then
+        -- Convert the sizes object to an array format
+        for name, details in pairs(response.sizes) do
+            table.insert(sizesArray, {
+                name = name,
+                width = details.width,
+                height = details.height,
+                crop = details.crop
+            })
+        end
+    end
+    
+    -- Return the array of sizes
+    return sizesArray
+end
+
+function generateFileNames(origWidth, origHeight, fileName, dimensions)
+    local origAspect = origWidth / origHeight
+	  -- Dateiendung extrahieren
+    local baseName = fileName:match("^(.*)%.")
+    local extension = fileName:match("%.([^%.]+)$")
+    local new = {}
+
+    for k, parttable in pairs(dimensions) do
+        
+        local dim = dimensions[k]
+        local crop = dim.crop
+        local newWidth = dim.width
+        local newHeight = dim.height
+        local suffix = ''
+        
+        if (crop and newWidth>0 and newHeight>0) then
+            -- Exact dimensions for cropped images
+            suffix = tostring(newWidth) .. 'x' .. tostring(newHeight)
+        elseif (not crop) then
+            -- Only the max dimension for scaled images
+            if (newWidth>=newHeight) then
+              -- landscape orientation
+              local calcHeight = round( newWidth / origAspect );
+              suffix = tostring(newWidth) .. 'x' .. tostring(calcHeight)
+            else
+              -- portrait orientation
+              local calcWidth = round( newHeight * origAspect );
+              suffix = tostring(calcWidth) .. 'x' .. tostring(newHeight)
+            end
+        else
+			suffix = 'unknown'
+		end
+
+        dim.file = baseName .. '-' .. suffix .. '.' .. extension
+        new[k] = dim
+    end
+
+    return new
+end
+
+-- Function to resize an image. Returns nothing
+function resizeImage(path, newpath, width, height, crop, quality, mime)
+	local cmd = ''
+	local resize = ''
+	local width = tostring(width)
+	local height = tostring(height)
+	local settings2 = ''
+	local minquality = 30
+	local newquality = 0
+	local area = width * height
+	newquality = math.min(quality, math.max(minquality, math.floor(quality * (area / 4369920))));
+
+	-- general settings for all image types
+	local settings1 = ' -filter Triangle -define filter:support=2.0 -colorspace sRGB -dither None -interlace none -unsharp 0.25x0.25+8+0.065 -depth 8'
+	if mime == 'image/avif' then
+		-- settings for AVIF
+		settings2 = ' -define heic:speed=5 -define heic:compression-effort=5 -define heic:threads=3 -define avif:effort=5 -define avif:threads=3'
+	elseif mime == 'image/webp' then
+		-- settings for WEBP
+		settings2 = ' -define webp:method=6 -define webp:low-memory=false'
+	elseif mime == 'image/jpeg' then
+		-- settings for JPEG
+		settings2 = ' -define jpeg:fancy-upsampling=off -define jpeg:sampling-factor=4:2:0'	
+	end
+	settings1 = settings1 .. settings2
+
+	if crop then
+		resize=width .. 'x' .. height ..'!'
+	else
+		resize=width
+	end
+
+	if WIN_ENV then
+		cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
+	else
+		cmd = pipath .. "/magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath -- TODO pipath is not defined here for MAC
+	end
+	Log('Resize-CMD: ', cmd)
+	LrTasks.execute( cmd ) 
+	return
+end
+
+function uploadMedia(newpath, newfilen, publishSettings, hash, mime, defaultcoll, folder, route, wpid)
+	
+	Log ('uploadMedia: ', newpath, newfilen, hash, mime, defaultcoll, folder, route)
+	-- check the parameters for nil or empty
+	if route == '' or route == nil or newfilen == nil or publishSettings == nil or hash == nil or mime == nil or folder == nil or defaultcoll == nil or newfilen == '' or publishSettings == '' or hash == '' or mime == '' or folder == '' or defaultcoll == ''  then
+		return false, {}
+	end
+
+	local generateSubsizes = publishSettings['generateSubsizes']
+
+	-- Check if the file exists
+    if LrFileUtils.exists(newpath) then
+        Log('Subsize-File exists: ', newpath)
+        
+        local url, httphead
+		local headervalue = ''
+
+        -- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
+        
+		-- CASE 2: new image to wordpress, original, WPCat
+		if defaultcoll and route == 'addtofolder' then
+            url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" -- uses the WP build in functionality to upload images via REST-API
+			headervalue = 'form-data'
+		
+		-- CASE 3: new image to wordpress, original, special folder
+		elseif route == 'addtofolder' then
+            url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/".. route .."/" .. folder -- uses the function of the REST-API-Plugin
+			headervalue = 'attachment'
+
+		-- CASE 1: new file, subsize, special folder (defaultcoll unused, not working in WP)
+        elseif route == 'filetofolder' then
+			-- if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before uploading the image
+            url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/".. route .."/" .. folder -- uses the function of the REST-API-Plugin
+			headervalue = 'attachment'
+		
+		-- CASE 5: update image in WordPress, original, special folder and WPCat
+		elseif route == 'updatemedia' and wpid ~= nil then
+			-- upload the updated and unscaled image which was generated by Lightroom -- uses the function of the REST-API-Plugin
+			-- changemime is added always, just in case. It does not disturb if not required.
+			local subsizesuploaded = ''
+			if generateSubsizes then
+				subsizesuploaded = '&subsizesuploaded=true' -- we assume here that all subsizes were uploaded successfully
+			end
+			url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/update/" .. tostring(wpid) .. "?changemime=true" .. subsizesuploaded
+			headervalue = 'form-data'
+		
+		-- CASE 4: update file, subsize, special folder
+		elseif route == 'updatefile' then
+			--if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before updating the image
+            url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/filetofolder/" .. folder .. "?overwrite"
+			headervalue = 'attachment'
+
+        else
+            local wpid = 'Internal: Wrong function call of AddNewMedia. Parameter mismatch'
+            Log('Upload Media: ', wpid)
+            return false, {}
+        end
+        
+		httphead = {
+			{field='Authorization', value=hash},
+			{field='Content-Disposition', value= headervalue .. '; filename=' .. newfilen},
+			{field='Content-Type', value=mime}
+		}
+
+        local imgfile = LrFileUtils.readFile(newpath)
+        local result, headers = LrHttp.post(url, imgfile, httphead)
+		Log('Upload-Result: ', headers.status, ' : ', url)
+		Log('Upload-Result: ', inspect(result))
+        return result, headers
+    else
+        Log('Subsize-File does not exist: ', newpath)
+        return false, {}
+    end
 end
