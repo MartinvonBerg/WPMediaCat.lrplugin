@@ -1045,18 +1045,24 @@ function generateFileNames(origWidth, origHeight, fileName, dimensions)
             suffix = tostring(newWidth) .. 'x' .. tostring(newHeight)
         elseif (not crop) then
             -- Only the max dimension for scaled images
-            if (newWidth>=newHeight) then
+            if (newWidth>=newHeight) and not (newWidth==0 or newWidth==9999) then
               -- landscape orientation
               local calcHeight = round( newWidth / origAspect );
               suffix = tostring(newWidth) .. 'x' .. tostring(calcHeight)
-            else
+            elseif not(newHeight==0 or newHeight==9999) then
               -- portrait orientation
               local calcWidth = round( newHeight * origAspect );
               suffix = tostring(calcWidth) .. 'x' .. tostring(newHeight)
+            elseif newWidth == 0 or newWidth == 9999 then
+              local calcWidth = round(newHeight * origAspect)
+              suffix = tostring(calcWidth) .. 'x' .. tostring(newHeight)
+            elseif newHeight == 0 or newHeight == 9999 then
+              local calcHeight = round(newWidth / origAspect)
+              suffix = tostring(newWidth) .. 'x' .. tostring(calcHeight)
+            else
+              suffix = 'wrong'
             end
-        else
-			suffix = 'unknown'
-		end
+        end
 
         dim.file = baseName .. '-' .. suffix .. '.' .. extension
         new[k] = dim
