@@ -213,6 +213,9 @@ Any welcome use the donate button for that. The development took me hundreds of 
     
     added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additonally local generation of WEBP and AVIF-Files with ImageMagick.
 
+- 1.5.0.1 / 04.12.2025: 
+    LrHTTP.post 'Delete' corrected to 'DELETE'
+
 # Credits
 - ZeroBrane Studio for Lua Debugging, https://studio.zerobrane.com/
 - inspect.lua by Enrique García Cota, https://github.com/kikito/inspect.lua

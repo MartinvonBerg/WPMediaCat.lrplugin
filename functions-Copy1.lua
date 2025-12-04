@@ -715,7 +715,7 @@ function DeleteMedia( publishSettings, wpmediaid )
 	url = publishSettings.siteURL .. "/wp-json/wp/v2/media/" .. tostring(wpmediaid) .. "?force=1"
 	--http://127.0.0.1/wordpress/wp-json/wp/v2/media/3439?force=1
 	--http-method: delete   
-	local result, headers = LrHttp.post( url, '', httphead, 'Delete' )
+	local result, headers = LrHttp.post( url, '', httphead, 'DELETE' )
   
 	if headers.status == 200 then
 		result = JSON:decode(result)
@@ -723,6 +723,9 @@ function DeleteMedia( publishSettings, wpmediaid )
 	elseif headers.status == 404 then -- also successful, ID is not available
 		result = JSON:decode(result)
 		result = result['code']
+		Log('Delete Code 404: ' .. tostring(wpmediaid) .. '. HTTP-Status: ' .. tostring(headers.status) .. ' Message: ' .. inspect(result))
+	else 
+		Log('Could not delete Media ID ' .. tostring(url) .. ' / HTTP-Status: ' .. tostring(headers.status) .. ' Message: ' .. inspect(result))
 	end
 	
 	return result

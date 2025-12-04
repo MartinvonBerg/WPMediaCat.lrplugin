@@ -924,6 +924,7 @@ function exportServiceProvider.deletePhotosFromPublishedCollection (publishSetti
         -- Bei erstellten Panos wird aber die Erstellungszeit geändert! Daher: IMMER löschen!
       if (tonumber(wpid) > 0) then 
         success = DeleteMedia(publishSettings, wpid)
+        Log('Delete WP-Media wpid: ' .. tostring(wpid) .. ' success: ' .. tostring(success) )
       end
 
       ResetCustomMeta (photo)
@@ -1012,6 +1013,7 @@ function exportServiceProvider.deletePublishedCollection( publishSettings, info 
     
     if (tonumber(wpid) > 0) then 
       DeleteMedia(publishSettings, wpid)
+      Log('Delete WP-Media wpid: ' .. tostring(wpid) .. ' success: ' .. tostring(success) )
     end
     
     ResetCustomMeta (photo)
