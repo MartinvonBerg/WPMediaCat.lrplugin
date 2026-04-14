@@ -11,12 +11,6 @@ local LrProgressScope = import( 'LrProgressScope' )
 local LrFunctionContext = import 'LrFunctionContext'
 local LrPhotoInfo = import 'LrPhotoInfo'
 
----- Get sytem and Lightroom version information
---if WIN_ENV then
---  os = 'WIN'
---else
---  os = 'macOS'
---end
 local version = LrApplication.versionTable()
 local LRVmajor = version['major']
 local LRVminor = version['minor']
@@ -25,11 +19,12 @@ local LRVrevis = version['revision']
 ----- Debug -----------
 --logDebug = false
 --require 'strict'
---require 'Logger'
+require 'Logger'
+InitLogger( false )
 --local DebugSync = false
 --local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
 --LrMobdebug.start()
---local inspect = require 'inspect'
+local inspect = require 'inspect'
 ----- Debug ------------
 --LrMobdebug.on()
 
@@ -293,7 +288,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               -- update photo including keywords. This is always the case for avif and webp-images
               result = 'none'
               result, data = UpdateMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder, wpid )
-              
+              Log('UpdateMedia-Result: ' .. result)
+              Log('data: ' .. inspect(data))
               if doConversion then
                 UpdateKeys( pseudoPublishSettings, WebpPhotoMeta, wpid )
               end
@@ -958,27 +954,6 @@ function exportServiceProvider.getCollectionBehaviorInfo( publishSettings )
   Log('firstSyncDoMetaOnly : ' .. inspect(publishSettings.firstSyncDoMetaOnly))
   Log('LrMeta_to_WP : ' .. inspect(publishSettings.LrMeta_to_WP))
   Log('OS: ' .. os .. ' LR-Version: ' .. LRVmajor .. '.' .. LRVminor .. '.' .. LRVrevis .. '.' )
-
-  -- check availability of ImageMagick on start-up 
-  -- delete-file First
-  --[[
-  local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-  local filepath = p2 .. '\\LRTestImagick.txt'
-  if LrFileUtils.exists( filepath ) then
-    LrFileUtils.delete( filepath )
-  end
-  
-  LrTasks.startAsyncTask( function(  )
-    local p2 = LrPathUtils.getStandardFilePath( 'documents' )
-    
-    -- do test for Imagemagick  
-    local cmd = 'magick -version > "' .. p2 .. '\\LRTestImagick.txt"' 
-    
-    Log ('image ', cmd)
-    LrTasks.execute( cmd ) 
-  end 
-  )
-  ]]
 
   return {
 		defaultCollectionName = LOC "$$$/Wordpress/DefaultCollectionName/WPCat=WPCat",

@@ -11,6 +11,12 @@ local Logger = LrLogger( "WP_MediaCat3" )
 -- log to logfile in ~/Documents/My Documents. Change this to 'print' to log to console
 Logger:enable( "logfile" )
 
+function InitLogger( defaultDebug )
+	if logDebug == nil then
+		logDebug = defaultDebug or false
+	end
+end
+
 function Log( ... )
 	if logDebug then
 		Logger:debug("Log: " .. ArgsToString( {...} ))
@@ -21,8 +27,18 @@ end
 function ArgsToString( argList )
 
 	local s = ""
+	local hasJson = JSON ~= nil and JSON.encode ~= nil
 	for i,v in pairs( argList ) do
-		s = s .. " " .. JSON:encode( v )
+		if hasJson then
+			local ok, encoded = pcall(function() return JSON:encode( v ) end)
+			if ok then
+				s = s .. " " .. encoded
+			else
+				s = s .. " " .. tostring(v)
+			end
+		else
+			s = s .. " " .. tostring(v)
+		end
     end
     return s
 

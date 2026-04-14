@@ -14,8 +14,14 @@ local LrPathUtils = import 'LrPathUtils'
 local LrFileUtils = import 'LrFileUtils'
 local share = LrView.share
 require 'Post'
---local inspect = require 'inspect' 
 ----------------------------------------
+----- Debug -----------
+--logDebug = true
+--require 'strict'
+--require 'Logger'
+--DebugSync = false
+inspect = require 'inspect'
+----- Debug ------------
 
 dialogs = {}
 
@@ -432,57 +438,83 @@ end
 
 function checkFileConversion( propertyTable )
 	-- body
-	Log( "checkFileConversion: " .. propertyTable.webpStatus) -- Debugging
+	Log( "checkFileConversion: " .. tostring(propertyTable.webpStatus)) -- Debugging
 	
 	if propertyTable.doConversion then
 		--propertyTable.webpStatus = 'Activated. Tested!'
 		local p2 = LrPathUtils.getStandardFilePath( 'documents' )
 		
-		local filepath = p2 .. DIRSEP .. 'LRTestImagick.txt'
+		local filepath  = p2 .. DIRSEP .. 'LRTestImagick.txt'
+		local attr = LrFileUtils.fileAttributes( filepath )
+		local size = attr['fileSize']
+
+		local filepath2 = p2 .. DIRSEP .. 'LRTestVips.txt'
+		local attr2 = LrFileUtils.fileAttributes( filepath2 )
+		local size2 = attr2['fileSize']
+
 		local value
                 
-		if not LrFileUtils.exists( filepath ) then
-			propertyTable.webpStatus = 'ImageMagick is not installed. Webp conversion not possible!'
+		-- First check for libvips (preferred)
+		if LrFileUtils.exists( filepath2 ) and size2 > 50 then
+			Log('Test libvips filesize: ', size)
+
+			propertyTable.webpStatus = 'libvips is installed!'
+			
+			value = math.floor(propertyTable.conversionQuality + 0.5)
+			if value > 100 then
+				value = 100	
+			end
+			propertyTable.conversionQuality = value
+
+			if propertyTable.fileFormat == 'none' then
+				propertyTable.webpStatus = 'libvips is installed! Select File Format!'
+			end
+			
+			if propertyTable.conversionQuality == 0 then
+				propertyTable.webpStatus = propertyTable.webpStatus .. ' Set Conversion Quality!'
+			end
+			Log('conversion settings: ', propertyTable.conversionQuality, propertyTable.fileFormat)
+		
+			--propertyTable.webpStatus = 'libvips not executable.'
+			--propertyTable.doConversion = false
+			
+		-- Fallback to ImageMagick if libvips not available
+		elseif LrFileUtils.exists( filepath ) and size > 50 then
+			Log('Test ImageMagick filesize: ', size)
+
+			propertyTable.webpStatus = 'ImageMagick is installed!'
+			
+			value = math.floor(propertyTable.conversionQuality + 0.5)
+			if value > 100 then
+				value = 100	
+			end
+			propertyTable.conversionQuality = value
+
+			if propertyTable.fileFormat == 'none' then
+				propertyTable.webpStatus = 'ImageMagick is installed! Select File Format!'
+			end
+			
+			if propertyTable.conversionQuality == 0 then
+				propertyTable.webpStatus = propertyTable.webpStatus .. ' Set Conversion Quality!'
+			end
+			Log('conversion settings: ', propertyTable.conversionQuality, propertyTable.fileFormat)
+		
+			--propertyTable.webpStatus = 'ImageMagick not executable. Webp conversion not possible!'
+			--propertyTable.doConversion = false
+			
+		else
+			propertyTable.webpStatus = 'ImageMagick and libvips are not available. Webp conversion not possible!'
 			propertyTable.doConversion = false
 			propertyTable.fileFormat = 'none'
 			propertyTable.conversionQuality = 0
-		else
-			local attr = LrFileUtils.fileAttributes( filepath )
-			local size = attr['fileSize']
-			Log('Test filesize: ', size)
-
-			if size > 50 then
-				propertyTable.webpStatus = 'ImageMagick is installed!'
-				
-				value = math.floor(propertyTable.conversionQuality + 0.5)
-				if value > 100 then
-					value = 100	
-				end
-				propertyTable.conversionQuality = value
-
-				if propertyTable.fileFormat == 'none' then
-					propertyTable.webpStatus = 'ImageMagick is installed! Select File Format!'
-				end
-				
-				if propertyTable.conversionQuality == 0 then
-					propertyTable.webpStatus = propertyTable.webpStatus .. ' Set Conversion Quality!'
-				end
-				Log('conversion settings: ', propertyTable.conversionQuality, propertyTable.fileFormat)
-			else
-				propertyTable.webpStatus = 'ImageMagick not executable. Webp conversion not possible!'
-				propertyTable.doConversion = false
-			end
-			
 		end
 	
 	else
 		propertyTable.webpStatus = 'WebP De-Activated. Check Installation if you tried to activate.'
 	end
 
-	--if MAC_ENV then
-	--	propertyTable.webpStatus = 'Not for macOS! Webp conversion not possible!'
-	--	propertyTableq.doConversion = false 
-	--end
+	Log('Result checkFileConversion: ', propertyTable.webpStatus)
+
 end
 
 -- Hilfsfunktion für den Dialog: Eingabefeld mit einheitlichen Parametern

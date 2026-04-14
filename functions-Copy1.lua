@@ -6,17 +6,16 @@ local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrPhotoInfo = import 'LrPhotoInfo'
---JSON=require 'JSON'
+JSON=require 'JSON'
 
 
 ----- Debug -----------
+--logDebug = false
 --require 'strict'
---require 'Logger'
---local DebugSync = logDebug
---local LrMobdebug = import 'LrMobdebug' -- Import LR/ZeroBrane debug module
---LrMobdebug.start()
---local inspect = require 'inspect'
------ Debug -----------
+require 'Logger'
+--DebugSync = false
+inspect = require 'inspect'
+----- Debug ------------
 
 ---------------------------------------------------------
 -- Write LR Metadata of photo to WP Mediacat via REST-API
@@ -311,6 +310,8 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
 	local generateSubsizes = publishSettings['generateSubsizes']
+	local convertStatus = publishSettings['webpStatus'] -- TODO : use this value in doConverion
+	local convertLib = 'none'
   
 	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -331,6 +332,15 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		Log('AddNewMedia: WP-Plugin not available')
 		wpid = 'WP-Plugin not available'
 		return wpid, restData
+	end
+
+	-- check the image conversion library and prepare the conversion command accordingly. 
+	-- the convertStatus is either 'libvips is installed! ...' or 'ImageMagick is installed! ...' or 'No library for conversion found ...'
+	-- The convertLib shall be set to either 'libvips' or 'magick' or 'none' accordingly. 
+	if doConversion then
+		Log('webPStatus: ', convertStatus)
+		convertLib = getConversionLibraryFromStatus( convertStatus )
+		Log('convertLib: ', convertLib)
 	end
 
 	-- get the dimensions of the original image
@@ -368,15 +378,23 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	end
 	
 	-- create the new file if webp or avif if set
-	if doConversion and fileFormat == 'WEBP' then
+	if doConversion and fileFormat == 'WEBP' and convertLib ~= 'none' then
 		mime = 'image/webp'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			if convertLib == 'magick' then
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			else
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+			end
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
+			if convertLib == 'magick' then
+				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
+			else
+				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+			end
 		end
 		Log('Webp-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -385,16 +403,25 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		Log('Webp-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
-	elseif doConversion and fileFormat == 'AVIF' then
+
+	elseif doConversion and fileFormat == 'AVIF' and convertLib ~= 'none' then
 		mime = 'image/avif'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'avif')
 		-- convert jpg file to avif with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+			if convertLib == 'magick' then
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+			else
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+			end
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
-		end
+			if convertLib == 'magick' then
+				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
+			else
+				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+			end
+		end	
 
 		Log('Avif-CMD: ', cmd)
 		LrTasks.execute( cmd ) 
@@ -423,7 +450,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 			Log('newpath: ', newpath)
 
 			-- resize the image
-			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime)
+			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime, convertLib)
 
 			-- upload the image CASE 1: new file, subsize, special folder
 			uploadMedia(newpath,           -- path to the file
@@ -483,6 +510,8 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
 	local generateSubsizes = publishSettings['generateSubsizes']
+	local convertStatus = publishSettings['webpStatus'] -- TODO : use this value in doConverion
+	local convertLib = 'none'
 	
 	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -502,6 +531,13 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 		Log('UpdateMedia: WP-Plugin not available')
 		wpid = 'WP-Plugin not available'
 		return wpid, restData
+	end
+
+	-- check the image conversion library and prepare the conversion command accordingly. 
+	if doConversion then
+		Log('webPStatus: ', convertStatus)
+		convertLib = getConversionLibraryFromStatus( convertStatus )
+		Log('convertLib: ', convertLib)
 	end
 
 	-- get the dimensions of the original image
@@ -539,15 +575,23 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	end
 
 		-- create the new file if webp or avif if set
-	if doConversion and fileFormat == 'WEBP' then
+	if doConversion and fileFormat == 'WEBP' and convertLib ~= 'none' then
 		mime = 'image/webp'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'webp')
 		-- convert jpg file to webp with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			if convertLib == 'magick' then
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
+			else
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+			end
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
+			if convertLib == 'magick' then
+				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
+			else
+				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+			end
 		end
 
 		Log('Webp-CMD: ', cmd)
@@ -558,15 +602,23 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 		LrTasks.sleep(0.1)
 		path = newfile
 
-	elseif doConversion and fileFormat == 'AVIF' then
+	elseif doConversion and fileFormat == 'AVIF' and convertLib ~= 'none' then
 		mime = 'image/avif'
 		local cmd = ''
 		local newfile = string.gsub( path, 'jpg', 'avif')
 		-- convert jpg file to avif with imagick. Must be installed
 		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+			if convertLib == 'magick' then
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
+			else
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\"" -- list with >> vips heifsave in CLI.
+			end
 		else
-			cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
+			if convertLib == 'magick' then
+				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
+			else
+				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+			end
 		end
 
 		Log('Avif-CMD: ', cmd)
@@ -579,24 +631,6 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 
 	end
 
-	-- get the upload folder for the default collection - currently unpublished
-	--[[
-	if defaultcoll then
-		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
-		Log("Anfrage des zu aktualisierenden Bildes über Standard-REST: ", url)
-		local httphead = {
-		  {field='Authorization', value=hash}        
-		}
-		local result, headers = LrHttp.get( url, httphead )
-		local result = JSON:decode(result)
-		local restData = ExtractDataFromREST(result)
-		local guid = restData.origurl
-		local filename = restData.origfile
-		local year, month = guid:match("http%S+/(%d%d%d%d)/(%d%d)/[%w_%-%.]+%.[%w]+")
-		folder = year .. "/" .. month
-		Log('File: ', filename, ' in Folder: ', folder)
-	end
-	--]]
 
 	-- generate and upload sub-sizes if set. For all file types
 	if generateSubsizes and not defaultcoll then
@@ -615,7 +649,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			Log('newpath: ', newpath)
 
 			-- resize the image
-			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime)
+			resizeImage(path, newpath, sizes[key].width, sizes[key].height, sizes[key].crop, conversionQuality, mime, convertLib)
 
 			-- upload the image CASE 4: update file, subsize, special folder
 			uploadMedia(newpath,           -- path to the file in local file system
@@ -638,7 +672,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	if headers.status == 200 then
 		result = JSON:decode(result)
 	else
-		wpid = 'Update Media Fault: ' .. tostring(headers.status .. ' : ' .. filen)
+		wpid = 'Update Media Fault: ' .. tostring((headers.status or 'nil') .. ' : ' .. filen)
 	end
 	
 	return wpid, result
@@ -1030,44 +1064,67 @@ end
 
 function generateFileNames(origWidth, origHeight, fileName, dimensions)
     local origAspect = origWidth / origHeight
-	  -- Dateiendung extrahieren
+
     local baseName = fileName:match("^(.*)%.")
     local extension = fileName:match("%.([^%.]+)$")
+
     local new = {}
 
-    for k, parttable in pairs(dimensions) do
-        
-        local dim = dimensions[k]
+    for k, dim in pairs(dimensions) do
+
         local crop = dim.crop
-        local newWidth = dim.width
-        local newHeight = dim.height
-        local suffix = ''
-        
-        if (crop and newWidth>0 and newHeight>0) then
-            -- Exact dimensions for cropped images
-            suffix = tostring(newWidth) .. 'x' .. tostring(newHeight)
-        elseif (not crop) then
-            -- Only the max dimension for scaled images
-            if (newWidth>=newHeight) and not (newWidth==0 or newWidth==9999) then
-              -- landscape orientation
-              local calcHeight = round( newWidth / origAspect );
-              suffix = tostring(newWidth) .. 'x' .. tostring(calcHeight)
-            elseif not(newHeight==0 or newHeight==9999) then
-              -- portrait orientation
-              local calcWidth = round( newHeight * origAspect );
-              suffix = tostring(calcWidth) .. 'x' .. tostring(newHeight)
-            elseif newWidth == 0 or newWidth == 9999 then
-              local calcWidth = round(newHeight * origAspect)
-              suffix = tostring(calcWidth) .. 'x' .. tostring(newHeight)
-            elseif newHeight == 0 or newHeight == 9999 then
-              local calcHeight = round(newWidth / origAspect)
-              suffix = tostring(newWidth) .. 'x' .. tostring(calcHeight)
+        local newWidth = dim.width or 0
+        local newHeight = dim.height or 0
+
+        -- Normalize 9999 → 0
+        if newWidth >= 9999 then newWidth = 0 end
+        if newHeight >= 9999 then newHeight = 0 end
+
+        local finalW, finalH
+
+        if crop and newWidth > 0 and newHeight > 0 then
+            -- exakt wie PHP
+            finalW = newWidth
+            finalH = newHeight
+
+        else
+            if newWidth > 0 and newHeight > 0 then
+                -- beide gesetzt → proportional einpassen
+                local targetAspect = newWidth / newHeight
+
+                if targetAspect > origAspect then
+                    -- begrenzt durch Höhe
+                    finalH = newHeight
+                    finalW = round(newHeight * origAspect)
+                else
+                    -- begrenzt durch Breite
+                    finalW = newWidth
+                    finalH = round(newWidth / origAspect)
+                end
+
+            elseif newWidth > 0 then
+                -- nur Breite vorgegeben
+                finalW = newWidth
+                finalH = round(newWidth / origAspect)
+
+            elseif newHeight > 0 then
+                -- nur Höhe vorgegeben
+                finalH = newHeight
+                finalW = round(newHeight * origAspect)
+
             else
-              suffix = 'wrong'
+                -- nichts gesetzt → Original
+                finalW = origWidth
+                finalH = origHeight
             end
         end
 
-        dim.file = baseName .. '-' .. suffix .. '.' .. extension
+        local suffix = tostring(finalW) .. "x" .. tostring(finalH)
+
+        dim.file = baseName .. "-" .. suffix .. "." .. extension
+        dim.width = finalW
+        dim.height = finalH
+
         new[k] = dim
     end
 
@@ -1075,15 +1132,17 @@ function generateFileNames(origWidth, origHeight, fileName, dimensions)
 end
 
 -- Function to resize an image. Returns nothing
-function resizeImage(path, newpath, width, height, crop, quality, mime)
+function resizeImage(path, newpath, width, height, crop, quality, mime, convertLib)
 	local cmd = ''
 	local resize = ''
-	local width = tostring(width)
-	local height = tostring(height)
+	local widthNum = tonumber(width) or 0
+	local heightNum = tonumber(height) or 0
+	local widthStr = tostring(widthNum)
+	local heightStr = tostring(heightNum)
 	local settings2 = ''
 	local minquality = 30
 	local newquality = 0
-	local area = width * height
+	local area = widthNum * heightNum
 	newquality = math.min(quality, math.max(minquality, math.floor(quality * (area / 4369920))));
 
 	-- general settings for all image types
@@ -1101,16 +1160,46 @@ function resizeImage(path, newpath, width, height, crop, quality, mime)
 	settings1 = settings1 .. settings2
 
 	if crop then
-		resize=width .. 'x' .. height ..'!'
+		resize=widthStr .. 'x' .. heightStr ..'!'
 	else
-		resize=width
+		resize=widthStr
 	end
 
-	if WIN_ENV then
-		cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
-	else
-		cmd = pipath .. "/magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath -- TODO pipath is not defined here for MAC
+	if convertLib == 'magick' then
+		if WIN_ENV then
+			cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
+		else
+			cmd = pipath .. "/magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath -- TODO pipath is not defined here for MAC
+		end
+
+	elseif convertLib == 'libvips' then
+		local outTarget = ""
+		local delCMD = WIN_ENV and "del /Q " or "rm "
+
+		if mime == 'image/webp' then
+			outTarget = newpath .. "[Q=" .. newquality .. ",effort=6,smart_subsample=true]"
+		elseif mime == 'image/avif' then
+			outTarget = newpath .. "[Q=" .. newquality .. ",effort=5]"
+		elseif mime == 'image/jpeg' then
+			outTarget = newpath .. "[Q=" .. newquality .. ",interlace=true]"
+		end
+
+		local tmp1 = "tmp_vips_1.v"
+		local tmp2 = "tmp_vips_2.v"
+		local tmp3 = "tmp_vips_3.v"
+
+		if crop then
+			cmd = "vips thumbnail \"" .. path .. "\" \"" .. tmp1 .. "\" --width " .. widthStr .. " --height " .. heightStr .. " --crop attention" -- or " --crop center
+		else
+			cmd = "vips thumbnail \"" .. path .. "\" \"" .. tmp1 .. "\" --width " .. widthStr
+		end
+
+		cmd = cmd
+			.. " && vips sharpen \"" .. tmp1 .. "\" \"" .. tmp2 .. "\" sigma=0.3 x1=2 y2=10 y3=20 m1=0 m2=3"
+			.. " && vips copy \"" .. tmp2 .. "\" \"" .. outTarget .. "\""
+			.. " && " .. delCMD .. "\"" .. tmp1 .. "\" \"" .. tmp2 .. "\""
 	end
+	
 	Log('Resize-CMD: ', cmd)
 	LrTasks.execute( cmd ) 
 	return
@@ -1189,4 +1278,25 @@ function uploadMedia(newpath, newfilen, publishSettings, hash, mime, defaultcoll
         Log('Subsize-File does not exist: ', newpath)
         return false, {}
     end
+end
+
+-- Parse conversion status text and return conversion library key.
+-- Returns: 'libvips', 'magick', or 'none'.
+function getConversionLibraryFromStatus(convertStatus)
+	if type(convertStatus) ~= 'string' or convertStatus == '' then
+		return 'none'
+	end
+
+	local status = string.lower(convertStatus)
+	local hasInstalled = string.find(status, 'installed', 1, true) ~= nil
+
+	if hasInstalled and string.find(status, 'libvips', 1, true) ~= nil then
+		return 'libvips'
+	end
+
+	if hasInstalled and string.find(status, 'imagemagick', 1, true) ~= nil then
+		return 'magick'
+	end
+
+	return 'none'
 end

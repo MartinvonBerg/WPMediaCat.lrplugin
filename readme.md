@@ -16,25 +16,23 @@ If you like this plugin buy me a coffee or a beer:
 
 ## Required WordPress-Plugin: 
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
-        2. Search for 'wp_wpcat_json_rest' by Martin von Berg.
+        2. Search for 'wpcat' or 'Media-Library-Extension' by Martin von Berg.
         3. Once found, click on 'Install'
         4. Go to the plugins page and activate the plugin. No settings required.
 
 ## Required Lightroom-Plugin:
         See Lightroom Documentation or google how to install a plugin. Shortform:
-        - Download the package or the whole from project from github
-        - Unpack everythin to a folder on your machine
+        - Download the package or the whole project from github
+        - Unpack everything to a folder on your machine
         - Open the Plug-in-Manger from Lightroom and navigate to the folder
         - Add this folder, activate and done
-# Debugging (optional):
-- Debugging messages could be found in the file WP_MediaCat3.log in your local Documents-directory.
-### How to Switch-Off all Debugging messages in the file WP_MediaCat3.log
-- Open the File `PluginGlobals.lua` and change the following line from 'true' to 'false' or vice versa. (wihtout quotes!)
-```lua
-logDebug = true -- or false
-```
-- Store the file `PluginGlobals.lua`
+        - Change settings for the upload service
 
+## Dependencies
+        - Exiftool for Metadatahandling
+        - libvips or ImageMagick for Image Conversion. Libvips is preferred and much faster.
+        - All have to be available from the Command line. Update PATH Variable after Installation.
+  
 # Plugin Settings
 
 
@@ -43,9 +41,9 @@ This is a standard procedure as with any other Publishing Plugin of Lightroom.
 
 ![setting1](/images/pisett1.JPG)
 
-Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs. (The snapshot is not up to date)
+Double Click on the Publish Service "WP_MediaCat.." shown here above in light grey. The following window will show up. All Settings have to be done under the two top-most tabs.
 
-![setting2](/images/pisett2.JPG)
+![setting2](/images/pisett2-1.png)
 
 First Tab `Publish service` Choose any name you like for the description.
 
@@ -68,7 +66,7 @@ Second Tab `WordPress Login Details and Settings:`
     - Test the Login with the Button `Test Login`. If the test is not successful (e.g. wrong Login Name or Password) it will not be possible to safe these settings. Additionally the installation of the WP-Plugin will be tested. The test gives you some hints. **BUT** that means that this Button has to be pressed every time you wish to change anything. 
     
     - Optional: Settings for File Upload (AVIF- and Webp-Conversion)
-        - Check if you wish to convert the files from jpg to webp prior to upload. This is only available if ImageMagick is installed on your machine. Check webpage of ImageMagick for the installation procedure on macOS or Windows.
+        - Check if you wish to convert the files from jpg to webp prior to upload. This is only available if Libvips or ImageMagick is installed on your machine. Check webpage of Libvips or ImageMagick for the installation procedure on macOS or Windows.
         - Check if you wish to reduce metadata with Exiftool, which has to be available in the install path.
         - **macOS** Copy the binary `magick`into the folder where you copied this Lightroom plugin.  
 
@@ -143,7 +141,7 @@ The publishing service can used like any other publish service in Lightroom. It 
 ![metaselect](./images/metaselect.JPG)
 - The small arrow right to the Image Link will guide you directly to the image in you WordPress Admin Panel (provided you are logged in).
 
-## Generate WordPress Code for Gutenberg
+## Generate WordPress Code for Gutenberg Image
 - Select on image - Right Click - Menu Opens - Select the third entry from the bottom
 - The correct Gutenberg Code for wp-image is copied to your clipboard.
 - Just paste this code to your page / post and you are done with adding an image!
@@ -153,7 +151,7 @@ The publishing service can used like any other publish service in Lightroom. It 
  
 # Updating of Plugins
 
-Update if you want AVIF and the conversion settings.
+Update if you want AVIF and the conversion settings or libvips
  
 
 # De-Installation of the Plugins
@@ -184,37 +182,44 @@ ONLY recommende if you know what you are doing. You need to copy directories, re
 
 
 # Bugs and TODOs
-
 - First-SYNC is problematic and performance dependant. If many images are synchronized LR will be blocked for a long time.
 - Sometimes the synchronization of the catalog is too slow, so correctly published images will be marked "to publish again". Select these images and set manually to 'up to date'.
 - TODO: Translation is not finalized yet.
 
  
 # License
-
 private use only!
 
 # Liability
+This is a private project from one person working in a full-time job as a Consultant in Functional Safety. If you need support you couldn't expect me to respond in hours. I can't give any Liability promises, you work on your own risk! Always backup!
 
-This is a private project from one person working in a full-time job as system engineer. If you need support you couldn't expect me to respond in hours. If you need a high quality, full-blown Lightroom Plugin I recommend to use this: https://meowapps.com/plugin/wplr-sync/ . I can't give any Liability promises, you work on your own risk! Always backup!
-
-# Testing
-No unit testing at all. Only did overall system test on two machines, see below. The result was tested on three different websites (local, staging and productive)
 ## Windos
-Test with LR 6.14 and LR 11.0.0 under Windows 10 21H0.
+Test with LR 6.14 and LR 11.0.0 under Windows 10 21H0. And Test with LR 15.0.1 and 15.2.1 under Windows 11.
 ## macOS
 Test with LR 11.0.0 under bigSUR 11.6.1.
 
-# Sponsoring
-Any welcome use the donate button for that. The development took me hundreds of hours.
+# Debugging (optional):
+- Debugging messages could be found in the file WP_MediaCat3.log in your local Documents-directory.
+### How to Switch-Off all Debugging messages in the file WP_MediaCat3.log
+- Open the File `PluginGlobals.lua` and change the following line from 'true' to 'false' or vice versa. (wihtout quotes!)
+```lua
+logDebug = true -- or false
+```
+- Store the file `PluginGlobals.lua`
 
 # Changelog
-- 1.5.0.0 / 20.10.2024:
-    
-    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additonally local generation of WEBP and AVIF-Files with ImageMagick.
+
+- 1.6.0.0 / 14.04.2026:
+    - Bugfix in Image Subsize generation for Portrait images (now according to WordPress)
+    - added libvips as preferred image converter. Fallback is imagick.
+    - changes in debug loggin
 
 - 1.5.0.1 / 04.12.2025: 
     LrHTTP.post 'Delete' corrected to 'DELETE'
+
+- 1.5.0.0 / 20.10.2024:
+    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additonally local generation of WEBP and AVIF-Files with ImageMagick.
+
 
 # Credits
 - ZeroBrane Studio for Lua Debugging, https://studio.zerobrane.com/
