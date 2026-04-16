@@ -387,13 +387,15 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 			if convertLib == 'magick' then
 				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\""
 			end
 		else
 			if convertLib == 'magick' then
 				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			end
 		end
 		Log('Webp-CMD: ', cmd)
@@ -413,13 +415,15 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 			if convertLib == 'magick' then
 				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\""
 			end
 		else
 			if convertLib == 'magick' then
 				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			end
 		end	
 
@@ -584,13 +588,15 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			if convertLib == 'magick' then
 				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\""
 			end
 		else
 			if convertLib == 'magick' then
 				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			end
 		end
 
@@ -611,13 +617,15 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			if convertLib == 'magick' then
 				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\"" -- list with >> vips heifsave in CLI.
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\""
 			end
 		else
 			if convertLib == 'magick' then
 				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			else
-				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			end
 		end
 
