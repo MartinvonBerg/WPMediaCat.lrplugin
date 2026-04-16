@@ -1,10 +1,59 @@
-# Overview
+# Lightroom → WordPress Media Publisher
+Upload and manage your Lightroom photos directly in the WordPress Media Library — including metadata, categories, and updates. Convert Images locally to webp and avif. Runs with LR 6.14 - 15.2, Win10/11, MAC OS.
+
+## Features
+
+- Upload images directly from Lightroom to WordPress
+- Convert Images(including subsizes) locally to webp and avif with own quality settings.
+- Update images without changing IDs
+- Sync metadata (title, description, EXIF)
+- Update pages and posts using the images with caption and image alt.
+- Organize images in custom folders/categories
+- Supports WebP and AVIF conversion
+
+## Screenshot
+![publish-service](/images/pisett2-1.png)
+
+# Contents
+- [Lightroom → WordPress Media Publisher](#lightroom--wordpress-media-publisher)
+  - [Features](#features)
+  - [Screenshot](#screenshot)
+- [Contents](#contents)
+- [Description](#description)
+- [Donate](#donate)
+- [Installation](#installation)
+  - [Required WordPress-Plugin](#required-wordpress-plugin)
+  - [Required Lightroom-Plugin](#required-lightroom-plugin)
+  - [Dependencies](#dependencies)
+  - [Example Workflow](#example-workflow)
+- [LR Plugin Settings](#lr-plugin-settings)
+  - [Standard Settings the Plugin in Lightroom:](#standard-settings-the-plugin-in-lightroom)
+- [Usage](#usage)
+  - [(Optional) First Synchronization with WordPress](#optional-first-synchronization-with-wordpress)
+  - [Later Synchronization](#later-synchronization)
+  - [Collections](#collections)
+  - [Publishing](#publishing)
+  - [Working with Metadata](#working-with-metadata)
+  - [Generate WordPress Code for Gutenberg Image](#generate-wordpress-code-for-gutenberg-image)
+- [Updating of Plugins](#updating-of-plugins)
+- [De-Installation of the Plugins](#de-installation-of-the-plugins)
+- [SPECIAL: Create further instancies of the Plugin to work with several websites](#special-create-further-instancies-of-the-plugin-to-work-with-several-websites)
+- [Bugs and TODOs](#bugs-and-todos)
+- [License](#license)
+  - [Liability](#liability)
+  - [Windos](#windos)
+  - [macOS](#macos)
+- [Debugging (optional):](#debugging-optional)
+    - [How to Switch-Off all Debugging messages in the file WP\_MediaCat3.log](#how-to-switch-off-all-debugging-messages-in-the-file-wp_mediacat3log)
+- [Changelog](#changelog)
+- [Credits](#credits)
+
+
+# Description
 This Lightroom Plugin is a publishing service for WordPress. Lightroom is used as a 'headless' editor for WordPress. All image work with metadata etc. is done in Lightroom. Publish your images to WordPress in one click and update or change whatever you want. This is always done with the same WordPress image. No need to change posts or pages anymore, if you changed something for the image, e.g. title or development settings like cropping or whatever. You may even update the Image alt_text and the caption in ALL posts and pages using that image.
- **Feedback is welcome**
 
 # Donate
 If you like this plugin buy me a coffee or a beer:
-
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CQA6XZ7LUMBJQ)
 
 
@@ -15,28 +64,33 @@ If you like this plugin buy me a coffee or a beer:
 -     Backup WordPress completely (including Database). If you don’t know how to do: Check google for that. There are great tutorials to find for that.
 -     Backup Lightroom Catalog (*.lrcat). If you don’t know how: Check google for that. There are great tutorials to find for that.
 
-## Required WordPress-Plugin: 
+## Required WordPress-Plugin
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
         2. Search for 'wpcat' or 'Media-Library-Extension' by Martin von Berg.
         3. Once found, click on 'Install'
         4. Go to the plugins page and activate the plugin.
         5. Go to Settings page and avtivate the Rest-API and other functions of the plugin.
 
-## Required Lightroom-Plugin:
-        See Lightroom Documentation or google how to install a plugin. Shortform:
-        - Download the package or the whole project from this github-repo.
-        - Unpack everything to a folder on your machine
-        - Open the Plug-in-Manger from Lightroom and navigate to the folder
-        - Add this folder, activate and done
-        - Change settings for the upload service (WP App Password required)
+## Required Lightroom-Plugin
+      1. Download the plugin
+      2. Extract `*.lrplugin`
+      3. Open Lightroom → Plugin Manager
+      4. Add plugin and activate
+      5. Do settings for the upload service (WP App Password required)
 
 ## Dependencies
         - Exiftool for Metadatahandling
-        - libvips or ImageMagick for Image Conversion. Libvips is preferred and much faster.
+        - For WebP / AVIF conversion: libvips or ImageMagick for Image Conversion. Libvips is preferred and much faster.
         - All have to be available from the Command line. Update PATH Variable after Installation.
-  
-# LR Plugin Settings 
 
+## Example Workflow
+
+1. Select images in Lightroom
+2. Click "Publish"
+3. Images appear in WordPress instantly
+   
+
+# LR Plugin Settings 
 
 ## Standard Settings the Plugin in Lightroom:
 This is a standard procedure as with any other Publishing Plugin of Lightroom. 
