@@ -310,7 +310,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
 	local generateSubsizes = publishSettings['generateSubsizes']
-	local convertStatus = publishSettings['webpStatus'] -- TODO : use this value in doConverion
+	local convertStatus = publishSettings['webpStatus']
 	local convertLib = 'none'
   
 	-- check parameters
@@ -391,9 +391,9 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 			end
 		else
 			if convertLib == 'magick' then
-				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			else
-				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
 			end
 		end
 		Log('Webp-CMD: ', cmd)
@@ -417,9 +417,9 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 			end
 		else
 			if convertLib == 'magick' then
-				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			else
-				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
 			end
 		end	
 
@@ -510,7 +510,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	local fileFormat = publishSettings['fileFormat']
 	local reduceMetaData = publishSettings['reduceMetaData']
 	local generateSubsizes = publishSettings['generateSubsizes']
-	local convertStatus = publishSettings['webpStatus'] -- TODO : use this value in doConverion
+	local convertStatus = publishSettings['webpStatus']
 	local convertLib = 'none'
 	
 	-- check parameters
@@ -588,9 +588,9 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			end
 		else
 			if convertLib == 'magick' then
-				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile -- TODO pipath is not defined here
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
 			else
-				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
 			end
 		end
 
@@ -615,9 +615,9 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			end
 		else
 			if convertLib == 'magick' then
-				cmd = pipath .. "/magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile -- TODO pipath is not defined here
+				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
 			else
-				cmd = pipath .. "/vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
+				cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
 			end
 		end
 
@@ -1169,7 +1169,7 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
 		else
-			cmd = pipath .. "/magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath -- TODO pipath is not defined here for MAC
+			cmd = "magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath
 		end
 
 	elseif convertLib == 'libvips' then

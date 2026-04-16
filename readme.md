@@ -8,7 +8,7 @@ If you like this plugin buy me a coffee or a beer:
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CQA6XZ7LUMBJQ)
 
 
-# Installation of the Plugins
+# Installation
 
 **! IMPORTANT !**
 
@@ -19,22 +19,23 @@ If you like this plugin buy me a coffee or a beer:
         1. Visit the plugins page on your WordPress Admin-page and click  ‘Add New’
         2. Search for 'wpcat' or 'Media-Library-Extension' by Martin von Berg.
         3. Once found, click on 'Install'
-        4. Go to the plugins page and activate the plugin. No settings required.
+        4. Go to the plugins page and activate the plugin.
+        5. Go to Settings page and avtivate the Rest-API and other functions of the plugin.
 
 ## Required Lightroom-Plugin:
         See Lightroom Documentation or google how to install a plugin. Shortform:
-        - Download the package or the whole project from github
+        - Download the package or the whole project from this github-repo.
         - Unpack everything to a folder on your machine
         - Open the Plug-in-Manger from Lightroom and navigate to the folder
         - Add this folder, activate and done
-        - Change settings for the upload service
+        - Change settings for the upload service (WP App Password required)
 
 ## Dependencies
         - Exiftool for Metadatahandling
         - libvips or ImageMagick for Image Conversion. Libvips is preferred and much faster.
         - All have to be available from the Command line. Update PATH Variable after Installation.
   
-# Plugin Settings
+# LR Plugin Settings 
 
 
 ## Standard Settings the Plugin in Lightroom:
@@ -77,7 +78,7 @@ Second Tab `WordPress Login Details and Settings:`
         - First-SYNC Metadata handling: Choose whether to write from LR to WP or from WP to LR. All Metadata will be overwritten! So, backup first, if you are in test-mode.
     
     - Select-Value-Settings for WP-Metadata
-        - Choose the assignment of Metadata. There is **NO** Consistency checking done. From Lightroom only the title and caption are used for Metadata. On the other hand WordPress uses four fields for Metadata: title, alt_text, caption and description. The titles are always mapped. For the mapping of the others you may use this settings.
+        - Choose the assignment of Metadata. There is **NO** Consistency checking done. From Lightroom only the title and caption are used for Metadata. On the other hand WordPress uses four fields for Metadata: title, alt_text, caption and description. The titles are always mapped. For the mapping of the others you may use this settings. The shown config is a Recommendation.
         - Update Caption for all Images with LR caption. Only for Gutenberg!
             The WordPress Plugin that you installed provides a function to update all pages and posts that are using the image. This is done **ALWAYS** for the alt_text (used for SEO). Optionally it could be done for the caption, too. **BUT** all captions on all pages and posts using the same image will be identical after that! So, if you are using context-dependant captions you should **NOT** activate this setting. Works only with Gutenberg: image, gallery, and image-with-text.
 
@@ -92,6 +93,7 @@ Second Tab `WordPress Login Details and Settings:`
     Note on WordPress: It is strongly recommended NOT to use the WP-Media-Library for editing of JPG-images any more. Edit / Add / Change / Update / Delete only with Lightroom after the first synchronization. The Catalog should be used for viewing and searching only. Nothing else. The usage of the created images in the catalog is identical to the standard usage in WordPress.
 
 ## (Optional) First Synchronization with WordPress
+Note: This process is slow and not perfect. You might skip that step.
 - Select the collection 'WPCat' (which can't be renamed or deleted)
 - Right-Click -> Select the entry First-SYNC... (second from the bottom)
 
@@ -191,7 +193,7 @@ ONLY recommende if you know what you are doing. You need to copy directories, re
 # License
 private use only!
 
-# Liability
+## Liability
 This is a private project from one person working in a full-time job as a Consultant in Functional Safety. If you need support you couldn't expect me to respond in hours. I can't give any Liability promises, you work on your own risk! Always backup!
 
 ## Windos

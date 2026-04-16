@@ -1,5 +1,6 @@
 --	Main entry point for plugin.
 -- TODO: Translation of all strings
+-- TODO: Enable Update etc. in WP Standard Folder 'WP-Media-Cat' and not only in subfolders.
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
