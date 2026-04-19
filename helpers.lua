@@ -14,7 +14,7 @@ function SplitFilename(strFilename)
     if strFilename ~= nil then
         return string.match(strFilename, "(.-)%.(%a+)")
     else
-        return nil
+        return '',''
     end
 end
 
@@ -94,10 +94,9 @@ end
 --  @param string file : the complete path or filename with extension
 --  @return string mime-type of the file 'mime/jpeg' or 'mime/png'
 function getMime(file)
-    local base = ''
     local mime = 'image/jpeg'
-    base = getfile(file)
-    base, ext = SplitFilename(base)
+    local base = getfile(file)
+    local _, ext = SplitFilename(base)
     ext = string.lower( ext )
 
     if ext == 'png' then
@@ -391,5 +390,36 @@ function getExecutablePath(executable)
     end
 
     return firstLine
+end
+
+function execWithOutput(cmd)
+
+    -- eindeutige Temp-Datei
+    local tmpFile = LrPathUtils.child(
+        LrPathUtils.getStandardFilePath('temp'),
+        'lr_cmd_output_.txt'
+    )
+
+    -- stdout + stderr umleiten
+    local fullCmd = cmd .. ' > "' .. tmpFile .. '" 2>&1'
+
+    Log('CMD: ' .. fullCmd)
+
+    -- ausführen
+    local result = LrTasks.execute(fullCmd)
+    Log('Exit-Code: ' .. tostring(result))
+
+    -- Datei lesen (SDK-konform)
+    local content = ''
+    if LrFileUtils.exists(tmpFile) then
+        content = LrFileUtils.readFile(tmpFile) or ''
+    end
+
+    Log('CMD-OUTPUT: ' .. content)
+
+    -- optional: aufräumen
+    LrFileUtils.delete(tmpFile)
+
+    return result, content
 end
 

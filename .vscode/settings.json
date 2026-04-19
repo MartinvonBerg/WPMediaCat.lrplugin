@@ -1,3 +1,21 @@
 {
-    "print.colourScheme": "Atelier Dune"
+    "print.colourScheme": "Atelier Dune",
+    "Lua.workspace.library": [
+        "c:\\Users\\safet\\.vscode\\extensions\\murayama-photo.lightroom-sdk-types-1.0.0\\types"
+    ],
+    "Lua.diagnostics.globals": [
+        "import",
+        "WIN_ENV",
+        "DIRSEP",
+        "Log",
+        "execWithOutput",
+        "json",
+        "_PLUGIN",
+    ],
+    "Lua.diagnostics.disable": [
+        "lowercase-global"
+    ],
+    "git.blame.editorDecoration.enabled": false,
+    "gitlens.currentLine.enabled": false,
+    "gitlens.codeLens.enabled": false
 }

@@ -2,6 +2,7 @@
 ---
 local LrApplication = import( 'LrApplication' )
 local LrFileUtils = import 'LrFileUtils'
+local LrPathUtils = import 'LrPathUtils'
 local LrHttp = import 'LrHttp'
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
@@ -32,6 +33,7 @@ function WritephotoMetaToWp( publishSettings, wpid, photoMeta )
 	--LrMobdebug.on()  
 	local success = false
 	local docaption = publishSettings['doCaption']
+	local restData = {}
 
 	if type(wpid) ~= 'string' then
 		wpid =  tostring(wpid)
@@ -312,6 +314,8 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	local generateSubsizes = publishSettings['generateSubsizes']
 	local convertStatus = publishSettings['webpStatus']
 	local convertLib = 'none'
+	local exiftoolPath = getExecutablePath('exiftool')
+	local exiftoolCmd = exiftoolPath and quote(exiftoolPath) or nil
   
 	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -352,28 +356,16 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
-		local hasExifTool = false
-		local pipath = _PLUGIN.path .. "\\exiftool"
-		
-		if not WIN_ENV then
-			pipath = '/usr/local/bin/exiftool' -- path according to the description on exiftool.org, but not tested
-		end
-		
-		if WIN_ENV then
-			hasExifTool = LrFileUtils.exists( pipath .. '.exe' )
-		else
-			hasExifTool = LrFileUtils.exists( pipath )
-		end
+		if exiftoolCmd then
+			cmd2 = "exiftool -P -adobe:all= -photoshop:all= -thumbnailimage= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile " .. quote(path) .. " -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all " .. quote(path)
+			execWithOutput( cmd2 )
 
-		if hasExifTool then
-			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
-			Log('exiftool-CMD-1: ', cmd2 )
-			LrTasks.execute( cmd2 )
-			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
-			Log('exiftool-CMD-2: ', cmd2 )
-			LrTasks.execute( cmd2 )
+			cmd2 = "exiftool -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= " .. quote(path)
+			execWithOutput( cmd2 )
 		else
-			Log('exiftool not found')
+			Log('exiftool not found in PATH')
+			wpid = 'Internal: exiftool not found in PATH. Required for Metadata reduction.'
+			return wpid, restData
 		end
 	end
 	
@@ -381,27 +373,23 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	if doConversion and fileFormat == 'WEBP' and convertLib ~= 'none' then
 		mime = 'image/webp'
 		local cmd = ''
-		local newfile = string.gsub( path, 'jpg', 'webp')
+		local cmd2 = ''
+		local newfile = string.gsub( path, '%.jpg$', '.webp')
 		-- convert jpg file to webp with imagick. Must be installed
-		if WIN_ENV then
-			if convertLib == 'magick' then
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\""
-			end
+
+		if convertLib == 'magick' then
+			cmd = "magick " .. quote(path) .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. quote(newfile)
 		else
-			if convertLib == 'magick' then
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
-			end
+			cmd = "vips copy " .. quote(path) .. " " .. quote(newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]")
+			cmd2 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all -ICC_PROFILE:all " .. quote(newfile)
 		end
-		Log('Webp-CMD: ', cmd)
-		LrTasks.execute( cmd ) 
+
+		execWithOutput( cmd ) 
+		if cmd2 ~= ''  then
+			execWithOutput( cmd2 )
+		end
 		Log('Webp-Path: ', newfile)
-		filen = string.gsub( filen, 'jpg', 'webp' )
+		filen = string.gsub(filen, '%.jpg$', '.webp')
 		Log('Webp-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
@@ -409,33 +397,27 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	elseif doConversion and fileFormat == 'AVIF' and convertLib ~= 'none' then
 		mime = 'image/avif'
 		local cmd = ''
-		local newfile = string.gsub( path, 'jpg', 'avif')
+		local newfile = string.gsub( path, '%.jpg$', '.avif')
 		-- convert jpg file to avif with imagick. Must be installed
-		if WIN_ENV then
-			if convertLib == 'magick' then
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\""
-			end
+		
+		if convertLib == 'magick' then
+			cmd = "magick " .. quote(path) .. " -quality " .. conversionQuality .. " " .. quote(newfile)
 		else
-			if convertLib == 'magick' then
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
-			end
-		end	
+			cmd = "vips copy " .. quote(path) .. " " .. quote(newfile .. "[Q=" .. conversionQuality .. ",effort=4]")
+			cmd2 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all  -ICC_PROFILE:all " .. quote(newfile)
+		end
 
-		Log('Avif-CMD: ', cmd)
-		LrTasks.execute( cmd ) 
-		Log('Avif-Path: ', newfile)	
-		filen = string.gsub( filen, 'jpg', 'avif' )
+		execWithOutput( cmd )
+		if cmd2 ~= ''  then
+			execWithOutput( cmd2 )
+		end
+		Log('Avif-Path: ', newfile)
+		filen = string.gsub( filen, '%.jpg$', '.avif' )
 		Log('Avif-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
 
-	end 
+	end
 
 	-- generate and upload sub-sizes if set. For all file types
 	if generateSubsizes and not defaultcoll then
@@ -447,7 +429,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		Log('WP-Files: ', files)
 		
 		-- generate the sub-sizes in a loop and upload them to wordpress
-		for key, name in pairs(sizes) do
+		for key,_ in pairs(sizes) do
 			local newfilen = sizes[key].file
 			local baseName = newfilen:match("^(.*)%.")
 			local newpath = string.gsub(path, "([^\\]+)%.([^%.]+)$", baseName .. ".%2")
@@ -485,7 +467,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 		local url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" .. tostring(wpid)
 		Log("Anfrage des neuen Bildes über Standard-REST: ", url)
 		local httphead = {
-		  {field='Authorization', value=hash}        
+		  {field='Authorization', value=hash}
 		}
 		local result, headers = LrHttp.get( url, httphead )
 		result = JSON:decode(result)
@@ -555,17 +537,12 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
-		local result = ''
 		if exiftoolCmd then
-			cmd2 = "exiftool -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile " .. quote(path) .. " -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all " .. quote(path)
-			Log('exiftool-CMD-1: ', cmd2 )
-			result = LrTasks.execute( cmd2 )
-			Log('exiftool-Result-1: ', result )
+			cmd2 = "exiftool -P -adobe:all= -photoshop:all= -thumbnailimage= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile " .. quote(path) .. " -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all " .. quote(path)
+			execWithOutput( cmd2 )
 
-			cmd2 = "exiftool -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= " .. quote(path) 
-			Log('exiftool-CMD-2: ', cmd2 )
-			result = LrTasks.execute( cmd2 )
-			Log('exiftool-Result-2: ', result )
+			cmd2 = "exiftool -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= " .. quote(path)
+			execWithOutput( cmd2 )
 		else
 			Log('exiftool not found in PATH')
 			wpid = 'Internal: exiftool not found in PATH. Required for Metadata reduction.'
@@ -577,28 +554,23 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	if doConversion and fileFormat == 'WEBP' and convertLib ~= 'none' then
 		mime = 'image/webp'
 		local cmd = ''
-		local newfile = string.gsub( path, 'jpg', 'webp')
+		local cmd2 = ''
+		local newfile = string.gsub( path, '%.jpg$', '.webp')
 		-- convert jpg file to webp with imagick. Must be installed
-		if WIN_ENV then
-			if convertLib == 'magick' then
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\"" 
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " -define webp:auto-filter=true \"" .. newfile .. "\""
-			end
+
+		if convertLib == 'magick' then
+			cmd = "magick " .. quote(path) .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. quote(newfile)
 		else
-			if convertLib == 'magick' then
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]\""
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " -define webp:auto-filter=true " .. newfile
-			end
+			cmd = "vips copy " .. quote(path) .. " " .. quote(newfile .. "[Q=" .. conversionQuality .. ",smart_subsample=true,effort=4]")
+			cmd2 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all -ICC_PROFILE:all " .. quote(newfile)
 		end
 
-		Log('Webp-CMD: ', cmd)
-		LrTasks.execute( cmd ) 
+		execWithOutput( cmd ) 
+		if cmd2 ~= ''  then
+			execWithOutput( cmd2 )
+		end
 		Log('Webp-Path: ', newfile)
-		filen = string.gsub( filen, 'jpg', 'webp' )
+		filen = string.gsub(filen, '%.jpg$', '.webp')
 		Log('Webp-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
@@ -606,34 +578,27 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	elseif doConversion and fileFormat == 'AVIF' and convertLib ~= 'none' then
 		mime = 'image/avif'
 		local cmd = ''
-		local newfile = string.gsub( path, 'jpg', 'avif')
+		local newfile = string.gsub( path, '%.jpg$', '.avif')
 		-- convert jpg file to avif with imagick. Must be installed
-		if WIN_ENV then
-			if convertLib == 'magick' then
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\"" 
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
-				cmd = "magick \"" .. path .. "\" -quality " .. conversionQuality .. " \"" .. newfile .. "\""
-			end
+		
+		if convertLib == 'magick' then
+			cmd = "magick " .. quote(path) .. " -quality " .. conversionQuality .. " " .. quote(newfile)
 		else
-			if convertLib == 'magick' then
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
-			else
-				--cmd = "vips copy \"" .. path .. "\" \"" .. newfile .. "[Q=" .. conversionQuality .. ",effort=4]\""
-				cmd = "magick " .. path .. " -quality " .. conversionQuality .. " " .. newfile
-			end
+			cmd = "vips copy " .. quote(path) .. " " .. quote(newfile .. "[Q=" .. conversionQuality .. ",effort=4]")
+			cmd2 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all  -ICC_PROFILE:all " .. quote(newfile)
 		end
 
-		Log('Avif-CMD: ', cmd)
-		LrTasks.execute( cmd ) 
-		Log('Avif-Path: ', newfile)	
-		filen = string.gsub( filen, 'jpg', 'avif' )
+		execWithOutput( cmd )
+		if cmd2 ~= ''  then
+			execWithOutput( cmd2 )
+		end
+		Log('Avif-Path: ', newfile)
+		filen = string.gsub( filen, '%.jpg$', '.avif' )
 		Log('Avif-file:', filen)
 		LrTasks.sleep(0.1)
 		path = newfile
 
 	end
-
 
 	-- generate and upload sub-sizes if set. For all file types
 	if generateSubsizes and not defaultcoll then
@@ -645,7 +610,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 		Log('WP-Files: ', files)
 		
 		-- generate the sub-sizes in a loop and upload them to wordpress
-		for key, name in pairs(sizes) do
+		for key,_ in pairs(sizes) do
 			local newfilen = sizes[key].file
 			local baseName = newfilen:match("^(.*)%.")
 			local newpath = string.gsub(path, "([^\\]+)%.([^%.]+)$", baseName .. ".%2")
@@ -735,12 +700,12 @@ function DeleteMedia( publishSettings, wpmediaid )
 	if tableHasKey( result, 'error' ) then
 		Log('DeleteMedia: ', result['error'])
 		wpid = result['error']
-		return wpid, restData
+		return wpid, {}
 	end
 	if not publishSettings.wpplugin then
 		Log('DeleteMedia: WP-Plugin not available')
 		wpid = 'WP-Plugin not available'
-		return wpid, restData
+		return wpid, {}
 	end
 	
 	local hash = 'Basic ' .. publishSettings.hash
@@ -945,12 +910,12 @@ function UpdateKeys( publishSettings, photometa, wpid )
 	if tableHasKey( result, 'error' ) then
 		Log('UpdateKeys: ', result['error'])
 		wpid = result['error']
-		return wpid, restData
+		return wpid, {}
 	end
 	if not publishSettings.wpplugin then
 		Log('UpdateKeys: WP-Plugin not available')
 		wpid = 'WP-Plugin not available'
-		return wpid, restData
+		return wpid, {}
 	end
 	
 	local httphead = {
@@ -1148,36 +1113,51 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 	local area = widthNum * heightNum
 	newquality = math.min(quality, math.max(minquality, math.floor(quality * (area / 4369920))));
 
-	-- general settings for all image types
-	local settings1 = ' -filter Triangle -define filter:support=2.0 -colorspace sRGB -dither None -interlace none -unsharp 0.25x0.25+8+0.065 -depth 8'
-	if mime == 'image/avif' then
-		-- settings for AVIF
-		settings2 = ' -define heic:speed=5 -define heic:compression-effort=5 -define heic:threads=3 -define avif:effort=5 -define avif:threads=3'
-	elseif mime == 'image/webp' then
-		-- settings for WEBP
-		settings2 = ' -define webp:method=6 -define webp:low-memory=false'
-	elseif mime == 'image/jpeg' then
-		-- settings for JPEG
-		settings2 = ' -define jpeg:fancy-upsampling=off -define jpeg:sampling-factor=4:2:0'	
-	end
-	settings1 = settings1 .. settings2
-
-	if crop then
-		resize=widthStr .. 'x' .. heightStr ..'!'
-	else
-		resize=widthStr
+	-- check if the input file exists
+	if not LrFileUtils.exists(path) then
+		Log('Resize: Input file does not exist: ', path)
+		return
 	end
 
 	if convertLib == 'magick' then
+		-- general settings for all image types
+		local settings1 = ' -filter Triangle -define filter:support=2.0 -colorspace sRGB -dither None -interlace none -unsharp 0.25x0.25+8+0.065 -depth 8'
+		if mime == 'image/avif' then
+			-- settings for AVIF
+			settings2 = ' -define heic:speed=5 -define heic:compression-effort=5 -define heic:threads=3 -define avif:effort=5 -define avif:threads=3'
+		elseif mime == 'image/webp' then
+			-- settings for WEBP
+			settings2 = ' -define webp:method=6 -define webp:low-memory=false'
+		elseif mime == 'image/jpeg' then
+			-- settings for JPEG
+			settings2 = ' -define jpeg:fancy-upsampling=off -define jpeg:sampling-factor=4:2:0'	
+		else
+			Log('Unsupported MIME type for magick: ', mime)
+		end
+		settings1 = settings1 .. settings2
+
+		if crop then
+			resize=widthStr .. 'x' .. heightStr ..'!'
+		else
+			resize=widthStr
+		end
+
 		if WIN_ENV then
 			cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
 		else
 			cmd = "magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath
 		end
 
+		execWithOutput(cmd)
+
 	elseif convertLib == 'libvips' then
 		local outTarget = ""
-		local delCMD = WIN_ENV and "del /Q " or "rm "
+		local delCMD = WIN_ENV and "cmd /C del /Q " or "rm "
+		local p2 = LrPathUtils.getStandardFilePath( 'temp' ) .. DIRSEP
+		local tmp1 = p2 .."tmp_vips_1.v"
+		local tmp2 = p2 .."tmp_vips_2.v"
+		local tmp3 = p2 .."tmp_vips_3.v"
+		local cmd1, cmd2, cmd3, cmd4, cmd5 = '', '', '', '', ''
 
 		if mime == 'image/webp' then
 			outTarget = newpath .. "[Q=" .. newquality .. ",effort=6,smart_subsample=true]"
@@ -1185,26 +1165,32 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 			outTarget = newpath .. "[Q=" .. newquality .. ",effort=5]"
 		elseif mime == 'image/jpeg' then
 			outTarget = newpath .. "[Q=" .. newquality .. ",interlace=true]"
+		else
+			Log('Unsupported MIME type for libvips: ', mime)
 		end
-
-		local tmp1 = "tmp_vips_1.v"
-		local tmp2 = "tmp_vips_2.v"
-		local tmp3 = "tmp_vips_3.v"
 
 		if crop then
-			cmd = "vips thumbnail \"" .. path .. "\" \"" .. tmp1 .. "\" --width " .. widthStr .. " --height " .. heightStr .. " --crop attention" -- or " --crop center
+			cmd1 = "vips thumbnail " .. quote(path) .. " " .. quote(tmp1) .. " " .. widthStr .. " --height " .. heightStr .. " --crop attention" -- or " --crop center
 		else
-			cmd = "vips thumbnail \"" .. path .. "\" \"" .. tmp1 .. "\" --width " .. widthStr
+			cmd1 = "vips thumbnail " .. quote(path) .. " " .. quote(tmp1) .. " " .. widthStr
 		end
-
-		cmd = cmd
-			.. " && vips sharpen \"" .. tmp1 .. "\" \"" .. tmp2 .. "\" sigma=0.3 x1=2 y2=10 y3=20 m1=0 m2=3"
-			.. " && vips copy \"" .. tmp2 .. "\" \"" .. outTarget .. "\""
-			.. " && " .. delCMD .. "\"" .. tmp1 .. "\" \"" .. tmp2 .. "\""
+		
+		cmd2 = "vips sharpen " .. quote(tmp1) .. " " .. quote(tmp2) .. " --sigma=0.3 --x1=2 --y2=10 --y3=20 --m1=0 --m2=3"
+		cmd3 = "vips copy " .. quote(tmp2) .. " " .. quote(outTarget)
+		cmd4 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all -ICC_PROFILE:all " .. quote(newpath)
+		cmd5 = delCMD .. " " .. quote(tmp1) .. " " .. quote(tmp2)
+		
+		execWithOutput(cmd1)
+		execWithOutput(cmd2)
+		execWithOutput(cmd3)
+		execWithOutput(cmd4)
+		execWithOutput(cmd5)
+		
+	else
+		Log('No valid conversion library available for resizing. Please check the settings and the conversion status. Resize skipped.')
+		return
 	end
 	
-	Log('Resize-CMD: ', cmd)
-	LrTasks.execute( cmd ) 
 	return
 end
 
