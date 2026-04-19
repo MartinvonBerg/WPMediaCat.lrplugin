@@ -2,6 +2,9 @@
 ----- Debug -----------
 
 local LrDate = import( 'LrDate' )
+local LrTasks = import( 'LrTasks' )
+local LrFileUtils = import 'LrFileUtils'
+local LrPathUtils = import 'LrPathUtils'
 
 
 ------------ helper functions for LR to WP Plugin --------------------------------------------
@@ -317,5 +320,76 @@ function isJSON(str)
     --local status = pcall(function() LrJson.decode(str) end)
     local status = pcall(function() json.decode(str) end)
     return status
+end
+
+function quote(s)
+    if WIN_ENV then
+        return quote_win(s)
+    else
+        return quote_posix(s)
+    end
+end
+
+function quote_win(s)
+    local result = '"'
+    local backslashes = 0
+
+    for i = 1, #s do
+        local c = s:sub(i,i)
+
+        if c == '\\' then
+            backslashes = backslashes + 1
+        elseif c == '"' then
+            result = result .. string.rep('\\', backslashes * 2 + 1) .. '"'
+            backslashes = 0
+        else
+            result = result .. string.rep('\\', backslashes) .. c
+            backslashes = 0
+        end
+    end
+
+    -- trailing backslashes vor dem schließenden Quote
+    result = result .. string.rep('\\', backslashes * 2)
+
+    result = result .. '"'
+    return result
+end
+
+function quote_posix(s)
+    return "'" .. string.gsub(s, "'", "'\\''") .. "'"
+end
+
+function getExecutablePath(executable)
+    if executable == nil or executable == '' then
+        return nil
+    end
+
+    local p2 = LrPathUtils.getStandardFilePath( 'documents' ) 
+    local tmpfile = p2 .. DIRSEP .. 'exe_check.txt'
+
+    local cmd = WIN_ENV and 'where "' .. executable .. '" > "' .. tmpfile .. '" 2>&1' or 'command -v "' .. executable .. '" > "' .. tmpfile .. '" 2>&1'
+    local status = LrTasks.execute(cmd)
+    local firstLine = nil
+
+    if status == 0 then
+        local contents = LrFileUtils.readFile(tmpfile)
+        if contents and contents ~= '' then
+            firstLine = string.match(contents, '^%s*([^\r\n]+)')
+        end
+    end
+
+    if tmpfile and tmpfile ~= '' then
+        LrFileUtils.delete( tmpfile )
+    end
+
+    if firstLine == nil or firstLine == '' then
+        return nil
+    end
+
+    if WIN_ENV and string.find(firstLine, 'Could not find files', 1, true) then
+        return nil
+    end
+
+    return firstLine
 end
 

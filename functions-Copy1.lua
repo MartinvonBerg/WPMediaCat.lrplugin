@@ -7,7 +7,7 @@ local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 local LrPhotoInfo = import 'LrPhotoInfo'
 JSON=require 'JSON'
-
+require 'helpers'
 
 ----- Debug -----------
 --logDebug = false
@@ -516,6 +516,8 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	local generateSubsizes = publishSettings['generateSubsizes']
 	local convertStatus = publishSettings['webpStatus']
 	local convertLib = 'none'
+	local exiftoolPath = getExecutablePath('exiftool')
+	local exiftoolCmd = exiftoolPath and quote(exiftoolPath) or nil
 	
 	-- check parameters
 	if publishSettings == {} or publishSettings['hash'] == '' or publishSettings['siteURL'] == '' or filename == '' or path == '' then
@@ -553,28 +555,21 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	-- reduce Metadata
 	if reduceMetaData then
 		local cmd2 = ''
-		local hasExifTool = false
-		local pipath = _PLUGIN.path .. "\\exiftool"
-		
-		if not WIN_ENV then
-			pipath = '/usr/local/bin/exiftool' -- path according to the description on exiftool.org, but not tested
-		end
-
-		if WIN_ENV then
-			hasExifTool = LrFileUtils.exists( pipath .. '.exe' )
-		else
-			hasExifTool = LrFileUtils.exists( pipath )
-		end
-
-		if hasExifTool then
-			cmd2 = pipath .. " -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile \"" .. path .. "\" -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all \"" .. path .. "\""
+		local result = ''
+		if exiftoolCmd then
+			cmd2 = "exiftool -P -adobe:all= -photoshop:all= -thumbnailimage= -icc_profile= -software= -serialnumber=0 -lensserialnumber=0 -xmp:all= -tagsFromFile " .. quote(path) .. " -XMP-iptcCore:all -XMP-dc:all -XMP-xmpRights:all " .. quote(path)
 			Log('exiftool-CMD-1: ', cmd2 )
-			LrTasks.execute( cmd2 )
-			cmd2 = pipath .. " -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= \"" .. path .. "\""
+			result = LrTasks.execute( cmd2 )
+			Log('exiftool-Result-1: ', result )
+
+			cmd2 = "exiftool -SensitivityType= -RecommendedExposureIndex= -MeteringMode= -LightSource= -Flash= -SubSecTimeOriginal= -SubSecTimeDigitized= -SensingMethod= -FileSource= -SceneType= -CFAPattern= -ExposureMode= -WhiteBalance= -SceneCaptureType= -GainControl= -Contrast= -Saturation= -Sharpness= -SubjectDistanceRange= " .. quote(path) 
 			Log('exiftool-CMD-2: ', cmd2 )
-			LrTasks.execute( cmd2 )
+			result = LrTasks.execute( cmd2 )
+			Log('exiftool-Result-2: ', result )
 		else
-			Log('exiftool not found')
+			Log('exiftool not found in PATH')
+			wpid = 'Internal: exiftool not found in PATH. Required for Metadata reduction.'
+			return wpid, restData
 		end
 	end
 
