@@ -266,9 +266,12 @@ logDebug = true -- or false
 
 # Changelog
 
+- 1.6.1.0 / 19.04.2026:
+    - Bug-Fix in AddMedia and UpdateMedia (vips and exiftool commands)
+
 - 1.6.1.0 / 16.04.2026:
     - Bug-Fix vips: changed main image generation back from vips to imagick. 'vips copy' removes metadata by any reason. It is reproducible and only for the dedicated command.
-    - 
+  
 - 1.6.0.0 / 14.04.2026:
     - Bugfix in Image Subsize generation for Portrait images (now according to WordPress)
     - added libvips as preferred image converter. Fallback is imagick.
