@@ -578,6 +578,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	elseif doConversion and fileFormat == 'AVIF' and convertLib ~= 'none' then
 		mime = 'image/avif'
 		local cmd = ''
+		local cmd2 = ''
 		local newfile = string.gsub( path, '%.jpg$', '.avif')
 		-- convert jpg file to avif with imagick. Must be installed
 		
@@ -1130,7 +1131,7 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 			settings2 = ' -define webp:method=6 -define webp:low-memory=false'
 		elseif mime == 'image/jpeg' then
 			-- settings for JPEG
-			settings2 = ' -define jpeg:fancy-upsampling=off -define jpeg:sampling-factor=4:2:0'	
+			settings2 = ' -define jpeg:fancy-upsampling=off -define jpeg:sampling-factor=4:2:0'
 		else
 			Log('Unsupported MIME type for magick: ', mime)
 		end
@@ -1142,12 +1143,8 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 			resize=widthStr
 		end
 
-		if WIN_ENV then
-			cmd = "magick \"" .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " \"" .. newpath .. "\"" 
-		else
-			cmd = "magick " .. path .. "\" -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. newpath
-		end
-
+		cmd = "magick " .. quote(path) .. " -quality " .. newquality .. settings1 .. " -resize " .. resize .. " " .. quote(newpath)
+		
 		execWithOutput(cmd)
 
 	elseif convertLib == 'libvips' then

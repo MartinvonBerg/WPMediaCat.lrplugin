@@ -243,7 +243,6 @@ ONLY recommende if you know what you are doing. You need to copy directories, re
 - Sometimes the synchronization of the catalog is too slow, so correctly published images will be marked "to publish again". Select these images and set manually to 'up to date'.
 - TODO: Translation is not finalized yet.
 
- 
 # License
 private use only!
 
@@ -265,7 +264,9 @@ logDebug = true -- or false
 - Store the file `PluginGlobals.lua`
 
 # Changelog
-
+- 1.6.2.0 / 20.04.2026:
+    - Bug Fix in functions-Copy1.lua
+    -   
 - 1.6.1.0 / 19.04.2026:
     - Bug-Fix in AddMedia and UpdateMedia (vips and exiftool commands)
 
