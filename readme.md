@@ -265,7 +265,7 @@ logDebug = true -- or false
 
 # Changelog
 - 2.0.0.0 / 20.04.2026
-    - Finally enabled the generation of subsizes for WordPress Standard-Folders which works only with the latest version of WP Media-Library-Extension https://github.com/MartinvonBerg/Media-Library-Extension
+    - Finally enabled the generation of subsizes for WordPress Standard-Folders which works only with the latest version of WP Media-Library-Extension https://github.com/MartinvonBerg/Media-Library-Extension.
   
 - 1.6.2.0 / 20.04.2026:
     - Bug Fix in functions-Copy1.lua
