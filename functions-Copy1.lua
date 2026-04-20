@@ -420,7 +420,7 @@ function AddNewMedia( publishSettings, filename, path, defaultcoll, folder )
 	end
 
 	-- generate and upload sub-sizes if set. For all file types
-	if generateSubsizes and not defaultcoll then
+	if generateSubsizes then -- defaultcoll
 		-- generate the filenames
 		sizes = getImageSubsizes(publishSettings, hash)
 		Log('WP-Subsizes: ', sizes)
@@ -602,7 +602,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 	end
 
 	-- generate and upload sub-sizes if set. For all file types
-	if generateSubsizes and not defaultcoll then
+	if generateSubsizes then -- defaultcoll
 		-- generate the filenames
 		sizes = getImageSubsizes(publishSettings, hash)
 		Log('WP-Subsizes: ', sizes)
@@ -1172,7 +1172,7 @@ function resizeImage(path, newpath, width, height, crop, quality, mime, convertL
 			cmd1 = "vips thumbnail " .. quote(path) .. " " .. quote(tmp1) .. " " .. widthStr
 		end
 		
-		cmd2 = "vips sharpen " .. quote(tmp1) .. " " .. quote(tmp2) .. " --sigma=0.3 --x1=2 --y2=10 --y3=20 --m1=0 --m2=3"
+		cmd2 = "vips sharpen " .. quote(tmp1) .. " " .. quote(tmp2) .. " --sigma=0.3 --x1=2 --y2=10 --y3=20 --m1=0 --m2=3" -- TODO : Test this settings: sigma=0.7–1.0 and m2=2–4
 		cmd3 = "vips copy " .. quote(tmp2) .. " " .. quote(outTarget)
 		cmd4 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all -ICC_PROFILE:all " .. quote(newpath)
 		cmd5 = delCMD .. " " .. quote(tmp1) .. " " .. quote(tmp2)
@@ -1211,7 +1211,7 @@ function uploadMedia(newpath, newfilen, publishSettings, hash, mime, defaultcoll
         -- Differ between Standard-Collection for the WP-Standard-Cat or another folder in the WP uploads-directory. This is a gallery = collection in LR
         
 		-- CASE 2: new image to wordpress, original, WPCat
-		if defaultcoll and route == 'addtofolder' then
+		if defaultcoll and route == 'addtofolder' then -- defaultcoll
             url = publishSettings['siteURL'] .. "/wp-json/wp/v2/media/" -- uses the WP build in functionality to upload images via REST-API
 			headervalue = 'form-data'
 		
@@ -1222,7 +1222,7 @@ function uploadMedia(newpath, newfilen, publishSettings, hash, mime, defaultcoll
 
 		-- CASE 1: new file, subsize, special folder (defaultcoll unused, not working in WP)
         elseif route == 'filetofolder' then
-			-- if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before uploading the image
+			if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before uploading the image
             url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/".. route .."/" .. folder -- uses the function of the REST-API-Plugin
 			headervalue = 'attachment'
 		
@@ -1239,7 +1239,7 @@ function uploadMedia(newpath, newfilen, publishSettings, hash, mime, defaultcoll
 		
 		-- CASE 4: update file, subsize, special folder
 		elseif route == 'updatefile' then
-			--if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before updating the image
+			if defaultcoll then folder = getWPStandardMediaFolder() end -- this should be used if the subsizes are uploaded to the WP-Standard-Cat before updating the image
             url = publishSettings['siteURL'] .. "/wp-json/extmedialib/v1/filetofolder/" .. folder .. "?overwrite"
 			headervalue = 'attachment'
 

@@ -380,7 +380,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           Log('Photo ' .. i ..': Adding File: ' .. filename .. ' to WP')
           Log('Rendition-Datei: ' .. renditionFilePath)
           Log('Folder: ' .. folder)
-          Log('Collec: ' .. tostring(defaultcoll) )
+          Log('Collection: ' .. tostring(defaultcoll) )
           
           local result = 'none'
           result, data = AddNewMedia( pseudoPublishSettings, filename, renditionFilePath, defaultcoll, folder ) -- Einschränkungen siehe dort!

@@ -69,7 +69,7 @@ If you like this plugin buy me a coffee or a beer:
         2. Search for 'wpcat' or 'Media-Library-Extension' by Martin von Berg.
         3. Once found, click on 'Install'
         4. Go to the plugins page and activate the plugin.
-        5. Go to Settings page and avtivate the Rest-API and other functions of the plugin.
+        5. Go to Settings page and activate the Rest-API and other functions of the plugin.
 
 ## Required Lightroom-Plugin
       1. Download the plugin
@@ -156,7 +156,7 @@ Note: This process is slow and not perfect. You might skip that step.
 - The synchronization will be started. This may take a while ...
 Depending on the settings unknown images will be downloaded, stored and added to the LR-catalog. 
 - Existing images in non-Standard WordPress-Folders will be added to (Sub-)Collections, like you can see in the image above.
-- The quality of the search process depends on your Lighroom catalog. I have several files with 'test.jpg' or 'noname.jpg' or copies of identical files several times it will be impossible to decide. It's not possible to decide which file was originally uploaded to WordPress. You have to do so with a manual process. Therefore:
+- The quality of the search process depends on your Lightroom catalog. I have several files with 'test.jpg' or 'noname.jpg' or copies of identical files several times it will be impossible to decide. It's not possible to decide which file was originally uploaded to WordPress. You have to do so with a manual process. Therefore:
 - After the First-SYNC the images are not published 
 - Select right images manually
     - remove alle GIFs and other files that are NOT JPG-Files. Keep the PNGs if you like that. But: PNGs will be converted to JPGs later on, if you DID NOT decide to use wepb. If you are not sure, remove PNGs, too.
@@ -219,7 +219,7 @@ Update if you want AVIF and the conversion settings or libvips
 
 # SPECIAL: Create further instancies of the Plugin to work with several websites
 
-ONLY recommende if you know what you are doing. You need to copy directories, rename them and work within the files of the plugin. Optional but highly recommended: Backup your LR database
+ONLY recommended if you know what you are doing. You need to copy directories, rename them and work within the files of the plugin. Optional but highly recommended: Backup your LR database
 1. Create a new directory under the directory where your plugin #1 already resides.
 2. Name this new dir to 'plugin2.lrdevplugin' or 'plugin2.lrplugin'.
     IMPORTANT: Always use 'lrdevplugin' or 'lrplugin' after a dot at the end of the folder name!
@@ -257,13 +257,16 @@ Test with LR 11.0.0 under bigSUR 11.6.1.
 # Debugging (optional):
 - Debugging messages could be found in the file WP_MediaCat3.log in your local Documents-directory.
 ### How to Switch-Off all Debugging messages in the file WP_MediaCat3.log
-- Open the File `PluginGlobals.lua` and change the following line from 'true' to 'false' or vice versa. (wihtout quotes!)
+- Open the File `PluginGlobals.lua` and change the following line from 'true' to 'false' or vice versa. (without quotes!)
 ```lua
 logDebug = true -- or false
 ```
 - Store the file `PluginGlobals.lua`
 
 # Changelog
+- 2.0.0.0 / 20.04.2026
+    - Finally enabled the generation of subsizes for WordPress Standard-Folders which works only with the latest version of WP Media-Library-Extension https://github.com/MartinvonBerg/Media-Library-Extension
+  
 - 1.6.2.0 / 20.04.2026:
     - Bug Fix in functions-Copy1.lua
     -   
@@ -282,7 +285,7 @@ logDebug = true -- or false
     LrHTTP.post 'Delete' corrected to 'DELETE'
 
 - 1.5.0.0 / 20.10.2024:
-    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additonally local generation of WEBP and AVIF-Files with ImageMagick.
+    added support for AVIF-Files. Minor Bugfixes. Added setting for conversion Quality and reduction of EXIF-Data. Added a check for reachability of WP-Site prior to upload. Could not test AVIF-upload completely due to WP-performance problems. Therefore added additionally local generation of WEBP and AVIF-Files with ImageMagick.
 
 
 # Credits

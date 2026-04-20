@@ -423,3 +423,8 @@ function execWithOutput(cmd)
     return result, content
 end
 
+function getWPStandardMediaFolder()
+    local now = LrDate.currentTime()
+    local dateTable = LrDate.timeToUserFormat(now, "%Y/%m")
+    return dateTable
+end
