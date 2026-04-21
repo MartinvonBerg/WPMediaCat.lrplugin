@@ -1,6 +1,5 @@
 --	Main entry point for plugin.
 -- TODO: Translation of all strings
--- TODO: Enable Upload,Update etc. in WP Standard Folder 'WP-Media-Cat' and not only in subfolders.
 
 local LrDialogs = import 'LrDialogs'
 local LrApplication = import( 'LrApplication' )
@@ -153,20 +152,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local WPalt = pseudoPublishSettings['WPalt'][1]
 	local WPdescr = pseudoPublishSettings['WPdescr'][1]
   local WPcap = pseudoPublishSettings['WPcap'][1]
-  --[[
-  local metaMatch = false
-  -- TODO: Decide to provide a setting for 'strict metadata handling'. If so, this outcommented part has to run in strict mode.
-  if ((LRcap == 'WPalt') and (WPalt == 'LRcap')) or ((LRcap == 'WPdescr') and (WPdescr == 'LRcap')) or ((LRcap == 'WPcap') and (WPcap == 'LRcap')) then 
-    metaMatch = true
-  else
-    Log('MetaData mismatch')
-    metaMatch = false
-    LrDialogs.message ('Warning','Mismatch of MetaData Assignment! Check Export Settings! Upload is canceled!')
-    progressScope:done()
-    return 
-  end 
-  ]]
-
+  
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     
     local success, pathOrMessage = rendition:waitForRender()
@@ -228,14 +214,12 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
       if base4search ~= nil then
         result2 = string.match(filename, base4search)
-        -- OverWriteMode. TODO: Decide whether to provide a setting for that.
-        -- SafeMode: Uncomment this line.
         result2 = 'overwrite' -- will force validPhoto to true
       end 
 
       if result1 ~= nil or result2 ~= nil then
         validPhoto = true -- Foto mit diesem Dateinamen existiert unter dieser wpid. Vergleichsergebnis wird gleich zugewiesen
-      end    
+      end
       
       -- check the manually created NEW virtual copy, reset Custom-metadata and set CopyName if ok
       -- filenames are OK but foldernames and gallery-names do not match
@@ -344,7 +328,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
               -- Meta: WP --> LR  : WP-data is in variable 'data'.
               -- Only done for titel and caption. Nothing more.
               -- Mind this could be quite anoying if WP data is empty! If so, all titles and captions will be deleted in LR. So, to use with care!
-              -- TODO: Decide whether to handle keywords also. 
+              -- Keywords are not processed because only title and caption are shown in the Admin Interface of WordPress.
               -- Check propertyTable selection for LRcap 
               local value = photo:getFormattedMetadata( 'caption' ) --fallback if the following does not provide a value
               if LRcap == 'WPalt'  then 
@@ -456,9 +440,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
           url = url .. '/wp-admin/post.php?post=' .. wpid .. '&action=edit'
           
           catalog:withWriteAccessDo( 'UpdateEditedFlag', function ()
-            -- TODO: new 11 / 2021. The RemoteID was not set before. Does this work? Why did it work before with getRemoteId?
-            -- Comment out or delete if other functions using the RemoteID do not work anymore.
-            pp:setRemoteId( wpid ) 
+            pp:setRemoteId( wpid )
             pp:setRemoteUrl( url)
             pp:setEditedFlag(false)
           end)
@@ -989,7 +971,7 @@ function exportServiceProvider.deletePublishedCollection( publishSettings, info 
     Log('wpid to delete: ', wpid)
     
     if (tonumber(wpid) > 0) then 
-      DeleteMedia(publishSettings, wpid)
+      local success = DeleteMedia(publishSettings, wpid)
       Log('Delete WP-Media wpid: ' .. tostring(wpid) .. ' success: ' .. tostring(success) )
     end
     

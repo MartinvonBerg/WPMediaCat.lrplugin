@@ -10,7 +10,7 @@
         "Log",
         "execWithOutput",
         "json",
-        "_PLUGIN",
+        "_PLUGIN","LrTasks", "LrDialogs"
     ],
     "Lua.diagnostics.disable": [
         "lowercase-global"

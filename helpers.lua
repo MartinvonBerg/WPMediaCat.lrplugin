@@ -1,5 +1,4 @@
------ Debug -----------
------ Debug -----------
+-- helpers.lua
 
 local LrDate = import( 'LrDate' )
 local LrTasks = import( 'LrTasks' )
@@ -9,7 +8,9 @@ local LrPathUtils = import 'LrPathUtils'
 
 ------------ helper functions for LR to WP Plugin --------------------------------------------
 
--- Returns the baseFilename, and Extension as 2 values
+--- Returns the baseFilename, and Extension as 2 values
+--- @param strFilename string with filename and extension, e.g. 'myphoto.jpg'
+--- @return string baseFilename, string extension
 function SplitFilename(strFilename)
     if strFilename ~= nil then
         return string.match(strFilename, "(.-)%.(%a+)")
@@ -18,7 +19,7 @@ function SplitFilename(strFilename)
     end
 end
 
----------------------- shorted if expressions ----------------------------------------------------------
+---------------------- local shorted if expressions ----------------------------------------------------------
 function ifnil(str, subst)
 	return ((str == nil) and subst) or str
 end 
@@ -29,9 +30,11 @@ function iif(condition, thenExpr, elseExpr)
 	else
 		return elseExpr
 	end
-end 
+end
 
--- iso8601ToTime(dateTimeISO8601) : returns Cocoa timestamp as used all through out Lr  
+--- iso8601ToTime(dateTimeISO8601) : returns Cocoa timestamp as used all through out Lr
+---@param dateTimeISO8601 string
+---@return unknown
 function iso8601ToTime(dateTimeISO8601)
     -- ISO8601: YYYY-MM-DD{THH:mm:{ss{Zssss}}
     -- date is mandatory, time as whole, seconds and timezone may or may not be present, e.g.:
@@ -47,7 +50,10 @@ function iso8601ToTime(dateTimeISO8601)
 									 iif(ifnil(tzone, '') == '', "local", tzone))
 end
 
--- write csv-file data to path with given seperator sep
+--- write csv-file data to path with given seperator sep
+---@param path string
+---@param data table of tables, e.g. {{field1=value1, field2=value2}, {field1=value3, field2=value4}}
+---@param sep string
 function csvwrite(path, data, sep)
 	  sep = sep or ';'
 	  local file = assert(io.open(path, "w"))
@@ -66,7 +72,10 @@ function csvwrite(path, data, sep)
 	  file:close()
 end
 
--- get filename of Path (the value after the last '/')  
+--- get filename of Path (the value after the last '/')
+---@param path string 
+---@param sep string|nil optional seperator, default is '/'
+---@return string
 function getfile(path, sep)
 	local n
 	path, n = path:gsub('\\','/')
@@ -89,10 +98,10 @@ function getfile(path, sep)
 	return path
 end
 
--- get the mime_type of a file
--- assuming only jpg or png files used for export and the real mime-type and file-extension match
---  @param string file : the complete path or filename with extension
---  @return string mime-type of the file 'mime/jpeg' or 'mime/png'
+--- get the mime_type of a file
+--- assuming only jpg or png files used for export and the real mime-type and file-extension match
+---  @param file string : the complete path or filename with extension
+---  @return string mime-type string of the file 'mime/jpeg' or 'mime/png'
 function getMime(file)
     local mime = 'image/jpeg'
     local base = getfile(file)
@@ -108,12 +117,19 @@ function getMime(file)
     return mime
 end
 
--- split string by given seperator
-function strsplit(string, sSeparator, nMax, bRegexp)
+--- split string by given seperator
+--- @param inString string to split
+--- @param sSeparator string separator, default is ','
+--- @param nMax nil|number maximum number of splits, default is nil (no limit)
+--- @param bRegexp nil|boolean whether sSeparator is a regular expression, default is false (plain)
+--- @return table array of split values
+function strsplit(inString, sSeparator, nMax, bRegexp)
 	
-    if sSeparator == '' then
-        sSeparator = ','
+    if inString == nil or inString == 'nil' then
+        return {}
     end
+
+    sSeparator = sSeparator or ','
 
     if nMax and nMax < 1 then
         nMax = nil
@@ -121,57 +137,29 @@ function strsplit(string, sSeparator, nMax, bRegexp)
 
     local aRecord = {}
 
-    if string == nil or string == 'nil' then
-        return aRecord
-    end
-
-    if string:len() > 0 then
+    if inString:len() > 0 then
         local bPlain = not bRegexp
         nMax = nMax or -1
 
         local nField, nStart = 1, 1
-        local nFirst,nLast = string:find(sSeparator, nStart, bPlain)
+        local nFirst,nLast = inString:find(sSeparator, nStart, bPlain)
         while nFirst and nMax ~= 0 do
-            aRecord[nField] = string:sub(nStart, nFirst-1)
+            aRecord[nField] = inString:sub(nStart, nFirst-1)
             nField = nField+1
             nStart = nLast+1
-            nFirst,nLast = string:find(sSeparator, nStart, bPlain)
+            nFirst,nLast = inString:find(sSeparator, nStart, bPlain)
             nMax = nMax-1
         end
-        aRecord[nField] = string:sub(nStart)
+        aRecord[nField] = inString:sub(nStart)
     end
 
     return aRecord
 end
 
----------------------------------------------------------------------
--- read sqlite3.exe result to table, result stored in *.txt, seperated by '|'
-function sqlread(path, sep, tonum, null)
-	tonum = tonum or true
-    sep = sep or ','
-    null = null or ''
-    local csvFile = {}
-    local fields = {}
-    local file = assert(io.open(path, "r"))
-    for line in file:lines() do
-        fields = strsplit(line, sep)
-        if tonum then -- convert numeric fields to numbers
-            for i=1,#fields do
-                local field = fields[i]
-                if field == '' then
-                    field = null
-                end
-                fields[i] = tonumber(field) or field
-            end
-        end
-        table.insert(csvFile, fields)
-    end
-    file:close()
-    return csvFile
-end
-
--- source: https://stackoverflow.com/questions/34618946/lua-base64-encode
--- encoding
+--- encode data to base64 string
+--- @source https://stackoverflow.com/questions/34618946/lua-base64-encode
+--- @param data string to encode
+--- @return string base64 encoded string
 function encb64(data)
     local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
     return ((data:gsub('.', function(x) 
@@ -186,7 +174,9 @@ function encb64(data)
     end)..({ '', '==', '=' })[#data%3+1])
 end
 
--- decoding
+--- decode base64 string
+--- @param data string to decode
+--- @return string decoded string
 function decb64(data)
     local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
     data = string.gsub(data, '[^'..b..'=]', '')
@@ -203,6 +193,9 @@ function decb64(data)
     end))
 end
 
+--- convert value to number if it is a number, otherwise return 'nil' as string
+--- @param value any value to convert to number
+--- @return number|string|nil
 function mytonumber( value )
     if type(value) == 'number' then
         return tonumber( value )
@@ -211,8 +204,11 @@ function mytonumber( value )
     end
 end
 
--- wird nach dem Aufrufen einer neuen Collection aufgerufen
--- check wether new Collection name is OK or fullfills the requirements
+--- check wether new Collection name is OK and fullfills the requirements (naming conventions)
+--- Do not allow WP standard folder names, no leading or trailing slashes, only a-zA-Z0-9-_/
+--- is called in in main.lua after the user has entered a name for the new collection, before creating the collection
+--- @param proposedName string name of the new collection to check
+--- @return boolean, string|nil returns true if name is ok, otherwise false and error message
 function checkfolder( proposedName )
     -- WP-StandardFolder nicht erlauben 
     -- WP erlaubt das: [a-zA-Z0-9\\/\\-_]*
@@ -246,9 +242,13 @@ function checkfolder( proposedName )
   
   end
 
-  -- array ist einfache Tabelle als liste mit Stringwerten, wie von strsplit gelifert
-  -- Annahme, dass der Wert nur einmal vorhanden ist
-  function findValueInArray (array, key, depth)
+--- array ist einfache Tabelle als liste mit Stringwerten, wie von strsplit gelifert
+--- Annahme, dass der Wert nur einmal vorhanden ist
+---@param array table simple Table as List of String values as returned by strsplit
+---@param key string value to find in array
+---@param depth string|integer optional depth to search in array, default is '' (search whole array), if 1 is given, only search for first value in array
+---@return integer index of key in array, or 0 if not found
+function findValueInArray (array, key, depth)
     local result = 0
     
     if depth == '' or depth == nil then
@@ -272,7 +272,9 @@ function checkfolder( proposedName )
     return result
 end
 
--- suffix für url bestimmen je nach anzahl metadaten '?' oder '&'
+---set suffix for url depending on number of metadata
+---@param n number
+---@return string '?' oder '&'
 function pre(n)
     
     local str = ''
@@ -284,7 +286,9 @@ function pre(n)
     return str
 end
 
--- url encode bzw. sanitize für korrekten code im http-request
+--- url encode bzw. sanitize für korrekten code im http-request
+--- @param url string to encode
+--- @return nil|string url encoded string
 function urlencode(url)
     
     local char_to_hex = function(c)
@@ -303,10 +307,17 @@ function urlencode(url)
 
 end
 
+---check whether key is defined in table
+---@param table table
+---@param key string
+---@return boolean
 function tableHasKey(table,key)
     return table[key] ~= nil
 end
 
+---round up number to integer
+---@param value number
+---@return integer
 function round(value)
     if value % 1 < 0.5 then
         return math.floor(value)
@@ -315,12 +326,10 @@ function round(value)
     end
 end
 
-function isJSON(str)
-    --local status = pcall(function() LrJson.decode(str) end)
-    local status = pcall(function() json.decode(str) end)
-    return status
-end
-
+---add quotes for WINDOWS or POSIX around a file or path.
+---@globals WIN_ENV boolean provided by LR SDK.
+---@param s string
+---@return string
 function quote(s)
     if WIN_ENV then
         return quote_win(s)
@@ -329,6 +338,9 @@ function quote(s)
     end
 end
 
+---add quotes for WINDOWS around a file or path.
+---@param s string
+---@return string
 function quote_win(s)
     local result = '"'
     local backslashes = 0
@@ -354,10 +366,16 @@ function quote_win(s)
     return result
 end
 
+---add quotes for POSIX around a file or path.
+---@param s string
+---@return string
 function quote_posix(s)
     return "'" .. string.gsub(s, "'", "'\\''") .. "'"
 end
 
+---get the path of an executable by calling 'where' on Windows or 'command -v' on POSIX systems, and return nil if not found.
+---@param executable string
+---@return nil|string
 function getExecutablePath(executable)
     if executable == nil or executable == '' then
         return nil
@@ -392,6 +410,9 @@ function getExecutablePath(executable)
     return firstLine
 end
 
+---execute a OS CLI command and return the exit code and the output as string.
+---@param cmd string
+---@return number, string
 function execWithOutput(cmd)
 
     -- eindeutige Temp-Datei
@@ -423,6 +444,8 @@ function execWithOutput(cmd)
     return result, content
 end
 
+---create a string with the current WordPress Upload Folder for Media like "2026/04"
+---@return string
 function getWPStandardMediaFolder()
     local now = LrDate.currentTime()
     local dateTable = LrDate.timeToUserFormat(now, "%Y/%m")

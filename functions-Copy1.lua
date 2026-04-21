@@ -565,7 +565,7 @@ function UpdateMedia( publishSettings, filename, path, defaultcoll, folder, wpid
 			cmd2 = "exiftool -overwrite_original -all= -TagsFromFile " .. quote(path) .. " -EXIF:all -XMP:all -ICC_PROFILE:all " .. quote(newfile)
 		end
 
-		execWithOutput( cmd ) 
+		execWithOutput( cmd )
 		if cmd2 ~= ''  then
 			execWithOutput( cmd2 )
 		end
